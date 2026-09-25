@@ -116,6 +116,7 @@ io.on('connection', (socket) => {
     const room = rooms[code];
     if (!room || room.hostSocketId !== socket.id) return;
     io.to(code).emit('game_start');
+    if (room.hostSocketId) io.to(room.hostSocketId).emit('game_start');
   });
 
   // ── CONTROLLER: continuous wheel state ──
