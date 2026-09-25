@@ -156,6 +156,14 @@ function playSample(src,vol){
   try{const a=new Audio(src);a.volume=vol||.7;a.play().catch(()=>{});}catch(e){}
 }
 function sfxShoot(){playSample(SND_SHOOT_SRC,.6);}
+function sfxTorpedo(){
+  // same machinegun sample as the regular gun, just louder and fired as
+  // 3 overlapping copies (one per torpedo) so they hit all at once
+  // instead of sounding sequenced.
+  playSample(SND_SHOOT_SRC,1.0);
+  playSample(SND_SHOOT_SRC,1.0);
+  playSample(SND_SHOOT_SRC,1.0);
+}
 function sfxHit(){playSample(SND_HIT_SRC,.8);}
 function sfxExplosion(){playSample(SND_HIT_SRC,.95);}
 function sfxRicochet(){playSample(SND_RICOCHET_SRC,.7);}
@@ -192,6 +200,7 @@ const TORPEDO_COOLDOWN=3600;
 const TORPEDO_DAMAGE=2;
 const TORPEDO_COUNT=3;
 const HP_MAX=6;
+const GUN_HITS_PER_DAMAGE=10; // machinegun bullets needed to take off 1 life point
 
 const PAL={
   A:{main:'#3fa9ff',dark:'#1a5f8f',light:'#bfe4ff'},
@@ -217,6 +226,7 @@ function makeShip(x,y,angle,side){
   return{
     x,y,angle,side,
     hp:HP_MAX,
+    gunHits:0,       // bullet hits accumulated toward the next life point lost
     speed:0,
     blink:0,
     gunCooldown:0,
@@ -275,7 +285,7 @@ function fireTorpedoes(ship){
     torpedoes.push({x:tx,y:ty,vx:dx*TORPEDO_SPEED,vy:dy*TORPEDO_SPEED,owner:ship.side});
   }
   spawnBurst(ship.x,ship.y,'#d8f3ff',10,70,false);
-  sfxPickup();
+  sfxTorpedo();
 }
 
 // ═══════════════════════════════════════════════════════
@@ -332,6 +342,16 @@ function updateShip(ship,dt){
   }
 }
 
+function registerGunHit(ship){
+  // machinegun bullets chip away 1/10th of a life point each; only every
+  // 10th confirmed hit actually removes a full point of life.
+  ship.gunHits=(ship.gunHits||0)+1;
+  if(ship.gunHits>=GUN_HITS_PER_DAMAGE){
+    ship.gunHits=0;
+    shipTakeDamage(ship,GUN_DAMAGE);
+  }
+}
+
 function shipTakeDamage(ship,dmg){
   if(ship.blink>0) return;
   ship.hp=Math.max(0,ship.hp-dmg);
@@ -362,7 +382,7 @@ function updateGame(dt){
       bullets.splice(i,1);
       spawnBurst(b.x,b.y,'#ffe27a',10,140,false);
       sfxHit();
-      shipTakeDamage(target,GUN_DAMAGE);
+      registerGunHit(target);
     }
   }
 
