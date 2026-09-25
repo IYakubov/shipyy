@@ -157,7 +157,9 @@ window.addEventListener('resize',resize);
 // ═══════════════════════════════════════════════════════
 const SHIP_LEN=78, SHIP_W=26;
 const SHIP_R=34;                 // collision radius
-const SHIP_SPEED=95;             // px/sec while thrusting — "not too fast"
+const SHIP_SPEED=95;             // px/sec top speed — "not too fast"
+const SHIP_ACCEL=140;            // px/sec^2 while holding the wheel
+const SHIP_DRAG=55;              // px/sec^2 of glide-down once released
 const TURN_RATE=1.35;            // rad/sec at full wheel deflection
 const MAX_WHEEL_DEG=120;         // wheel angle that maps to full turn rate
 const GUN_SPEED=560;
@@ -193,6 +195,7 @@ function makeShip(x,y,angle,side){
   return{
     x,y,angle,side,
     hp:HP_MAX,
+    speed:0,
     blink:0,
     gunCooldown:0,
     torpCooldown:0,
@@ -276,12 +279,23 @@ function updateShip(ship,dt){
 
   if(ctrl.gunHeld) fireGun(ship);
 
+  // speed ramps up while the wheel is held, and drains slowly (drag)
+  // once released, so the ship glides on instead of stopping dead.
   if(ctrl.thrust){
-    const norm=Math.max(-1,Math.min(1,ctrl.angle/MAX_WHEEL_DEG));
-    ship.angle+=norm*TURN_RATE*sec;
+    ship.speed=Math.min(SHIP_SPEED,ship.speed+SHIP_ACCEL*sec);
+  }else{
+    ship.speed=Math.max(0,ship.speed-SHIP_DRAG*sec);
+  }
 
-    const dx=Math.cos(ship.angle)*SHIP_SPEED*sec;
-    const dy=Math.sin(ship.angle)*SHIP_SPEED*sec;
+  if(ship.speed>0.5){
+    // steering still answers to the wheel while gliding, like a real
+    // rudder keeps working as long as the ship has way on
+    const norm=Math.max(-1,Math.min(1,ctrl.angle/MAX_WHEEL_DEG));
+    const turnFactor=Math.min(1,ship.speed/SHIP_SPEED);
+    ship.angle+=norm*TURN_RATE*turnFactor*sec;
+
+    const dx=Math.cos(ship.angle)*ship.speed*sec;
+    const dy=Math.sin(ship.angle)*ship.speed*sec;
     ship.x=Math.max(SHIP_R,Math.min(AW-SHIP_R,ship.x+dx));
     ship.y=Math.max(SHIP_R,Math.min(AH-SHIP_R,ship.y+dy));
 
