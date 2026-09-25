@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Naval Duel</title>
+<script src="/socket.io/socket.io.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@500;600;700;800&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#061826;
+  --panel:#0c2436;
+  --panel2:#123249;
+  --border:#1f4a63;
+  --accentA:#3fa9ff;
+  --accentB:#ff9f45;
+  --cyan:#66d1ff;
+  --text:#e7f4ff;
+  --textdim:#7f9fb4;
+}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:'Nunito',sans-serif;user-select:none}
+body{display:flex;flex-direction:column}
+
+/* ── TOPBAR ── */
+#topbar{width:100%;flex-shrink:0;display:flex;align-items:stretch;background:var(--panel);border-bottom:2px solid var(--border)}
+.tb-side{display:flex;align-items:center;gap:10px;padding:8px 18px;flex:0 0 300px;border-bottom:4px solid}
+.tb-side.left{border-color:var(--accentA)}
+.tb-side.right{border-color:var(--accentB);flex-direction:row-reverse}
+.tb-name{font-family:'Baloo 2',sans-serif;font-size:.8rem;font-weight:700;letter-spacing:.02em}
+.pAc{color:var(--accentA)}
+.pBc{color:var(--accentB)}
+.tb-info{display:flex;flex-direction:column;gap:4px}
+.hp-bar{width:120px;height:9px;border-radius:5px;background:var(--panel2);border:1px solid var(--border);overflow:hidden}
+.hp-fill{height:100%;transition:width .25s;border-radius:5px}
+.hp-A{background:var(--accentA)}
+.hp-B{background:var(--accentB)}
+.hprow{display:flex;align-items:center;gap:6px}
+.hpval{font-size:.62rem;color:var(--textdim);min-width:32px;font-weight:700}
+.torp-slots{display:flex;gap:3px;align-items:center}
+.torp-pip{width:10px;height:6px;border-radius:2px;border:1px solid var(--border);transition:all .15s}
+.torp-pip.lA{background:var(--accentA);border-color:var(--accentA)}
+.torp-pip.lB{background:var(--accentB);border-color:var(--accentB)}
+.torp-label{font-size:.56rem;color:var(--textdim);letter-spacing:.02em;font-weight:700}
+.tb-center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border-left:1px solid var(--border);border-right:1px solid var(--border)}
+.game-title{font-family:'Baloo 2',sans-serif;font-size:.75rem;font-weight:800;letter-spacing:.12em;color:var(--cyan)}
+.status-line{font-size:.62rem;color:var(--textdim);letter-spacing:.02em;font-weight:700}
+
+/* ── ARENA ── */
+#arena{position:relative;flex:1;overflow:hidden;background:var(--bg)}
+canvas{display:block;position:absolute;top:0;left:0}
+
+/* ── SCREENS ── */
+.screen{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:rgba(6,24,38,.95);z-index:100;padding:20px}
+.screen.hidden{display:none}
+.ov-tag{font-size:.7rem;font-weight:700;letter-spacing:.06em;color:var(--cyan);background:var(--panel2);border:2px solid var(--border);border-radius:999px;padding:5px 16px;text-transform:uppercase}
+.screen-title{font-family:'Baloo 2',sans-serif;font-size:2.6rem;font-weight:800;color:var(--cyan);letter-spacing:.01em;text-align:center}
+.screen-sub{font-size:.85rem;color:var(--textdim);text-align:center;max-width:480px;line-height:1.6;font-weight:600}
+.btn-row{display:flex;gap:16px;flex-wrap:wrap;justify-content:center}
+.net-btn{padding:16px 36px;background:var(--cyan);border:none;border-radius:20px;color:#04141f;font-family:'Baloo 2',sans-serif;font-size:1rem;letter-spacing:.02em;font-weight:700;cursor:pointer;box-shadow:0 6px 0 #1f7fa3;transition:transform .1s}
+.net-btn:active{transform:translateY(4px);box-shadow:0 2px 0 #1f7fa3}
+.net-btn:disabled{opacity:.4;cursor:default}
+.room-code{font-family:'Baloo 2',sans-serif;font-size:3rem;font-weight:800;letter-spacing:.2em;color:var(--cyan);padding:16px 32px;border:2px solid var(--border);border-radius:20px;background:var(--panel)}
+.share-row{display:flex;gap:20px;flex-wrap:wrap;justify-content:center}
+.share-card{display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 18px;border:2px solid var(--border);border-radius:18px;background:var(--panel);min-width:190px}
+.share-card-title{font-family:'Baloo 2',sans-serif;font-size:.78rem;font-weight:700;color:var(--text)}
+.share-qr{width:140px;height:140px;border-radius:10px;background:#fff}
+.share-link{font-size:.6rem;color:var(--textdim);word-break:break-all;text-align:center;max-width:180px;font-weight:600}
+.lobby-players{display:flex;gap:24px;margin-top:4px}
+.lp{display:flex;flex-direction:column;align-items:center;gap:8px;font-family:'Baloo 2',sans-serif;font-size:.78rem;letter-spacing:.02em;min-width:150px;padding:14px;border:2px solid var(--border);border-radius:16px;background:var(--panel)}
+.lp-dot{width:13px;height:13px;border-radius:50%;background:var(--border);transition:all .25s}
+.lp-dot.on{background:var(--cyan)}
+.lp-dot.ready{background:#3ddc84}
+.lp-status{font-size:.6rem;letter-spacing:.02em;color:var(--textdim);font-weight:700}
+#final-title{font-family:'Baloo 2',sans-serif;font-size:2.2rem;font-weight:800}
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div id="topbar">
+  <div class="tb-side left">
+    <div class="tb-info">
+      <div class="tb-name pAc">Player A</div>
+      <div class="hprow"><div class="hp-bar"><div class="hp-fill hp-A" id="hpA" style="width:100%"></div></div><span class="hpval pAc" id="hpvalA">6/6</span></div>
+      <div class="torp-slots" id="torpA"></div>
+    </div>
+  </div>
+  <div class="tb-center">
+    <div class="game-title">Naval Duel</div>
+    <div class="status-line" id="status-line">Sink the enemy ship</div>
+  </div>
+  <div class="tb-side right">
+    <div class="tb-info" style="align-items:flex-end">
+      <div class="tb-name pBc">Player B</div>
+      <div class="hprow" style="flex-direction:row-reverse"><div class="hp-bar"><div class="hp-fill hp-B" id="hpB" style="width:100%"></div></div><span class="hpval pBc" id="hpvalB">6/6</span></div>
+      <div class="torp-slots" id="torpB" style="flex-direction:row-reverse"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ARENA -->
+<div id="arena">
+  <canvas id="c"></canvas>
+
+  <!-- SCREEN 1: HOME -->
+  <div class="screen" id="screen-home">
+    <div class="ov-tag">2 players</div>
+    <div class="screen-title">Naval Duel</div>
+    <div class="screen-sub">A two-player ship battle! Open this on a TV or computer, then each player steers their ship from a phone with a ship's wheel.</div>
+    <div class="btn-row"><button class="net-btn" id="btn-create">Create Game</button></div>
+  </div>
+
+  <!-- SCREEN 2: LOBBY -->
+  <div class="screen hidden" id="screen-lobby">
+    <div class="ov-tag">Waiting for players</div>
+    <div class="screen-sub">Share this code — each player opens the controller on their phone and enters it:</div>
+    <div class="room-code" id="room-code-display">------</div>
+    <div class="share-row">
+      <div class="share-card">
+        <div class="share-card-title">Join as controller</div>
+        <img class="share-qr" id="join-qr" alt="QR code to join"/>
+        <div class="share-link" id="join-link"></div>
+      </div>
+    </div>
+    <div class="lobby-players">
+      <div class="lp"><div class="lp-dot" id="dot-a"></div><span>Player A</span><span class="lp-status" id="status-a">Waiting...</span></div>
+      <div class="lp"><div class="lp-dot" id="dot-b"></div><span>Player B</span><span class="lp-status" id="status-b">Waiting...</span></div>
+    </div>
+    <div class="screen-sub">Waiting for both players to connect and press Ready...</div>
+  </div>
+
+  <!-- SCREEN 3: GAME OVER -->
+  <div class="screen hidden" id="screen-gameover">
+    <div class="ov-tag">Battle over</div>
+    <div id="final-title">Player A Wins!</div>
+    <button class="net-btn" id="btn-restart">Rematch</button>
+  </div>
+
+  <div id="toast" style="position:absolute;top:12px;left:50%;transform:translateX(-50%);font-size:.78rem;font-weight:700;padding:8px 18px;background:var(--panel);border:2px solid var(--border);border-radius:999px;color:var(--text);pointer-events:none;opacity:0;transition:opacity .3s;z-index:200;white-space:nowrap"></div>
+</div>
+
+<script>
+'use strict';
+// ═══════════════════════════════════════════════════════
+//  CANVAS / ARENA
+// ═══════════════════════════════════════════════════════
+const canvas=document.getElementById('c');
+const ctx=canvas.getContext('2d');
+const arena=document.getElementById('arena');
+let AW=0,AH=0;
+function resize(){ AW=arena.clientWidth;AH=arena.clientHeight;canvas.width=AW;canvas.height=AH; }
+window.addEventListener('resize',resize);
+
+// ═══════════════════════════════════════════════════════
+//  CONSTANTS
+// ═══════════════════════════════════════════════════════
+const SHIP_LEN=78, SHIP_W=26;
+const SHIP_R=34;                 // collision radius
+const SHIP_SPEED=95;             // px/sec while thrusting — "not too fast"
+const TURN_RATE=1.35;            // rad/sec at full wheel deflection
+const MAX_WHEEL_DEG=120;         // wheel angle that maps to full turn rate
+const GUN_SPEED=560;
+const GUN_COOLDOWN=170;
+const GUN_DAMAGE=1;
+const TORPEDO_SPEED=230;
+const TORPEDO_COOLDOWN=3600;
+const TORPEDO_DAMAGE=2;
+const TORPEDO_COUNT=3;
+const HP_MAX=6;
+
+const PAL={
+  A:{main:'#3fa9ff',dark:'#1a5f8f',light:'#bfe4ff'},
+  B:{main:'#ff9f45',dark:'#a15c1f',light:'#ffd9b0'}
+};
+
+// ═══════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════
+let shipA=null, shipB=null;
+let bullets=[]; // {x,y,vx,vy,owner,dead}
+let torpedoes=[]; // {x,y,vx,vy,owner,dead}
+let particles=[];
+let waves=[];
+let gameActive=false;
+let lastTs=0;
+const netInput={
+  A:{angle:0,thrust:false,gunHeld:false},
+  B:{angle:0,thrust:false,gunHeld:false}
+};
+
+function makeShip(x,y,angle,side){
+  return{
+    x,y,angle,side,
+    hp:HP_MAX,
+    blink:0,
+    gunCooldown:0,
+    torpCooldown:0,
+    trailT:0,
+    alive:true
+  };
+}
+
+function spawnPositions(){
+  const m=Math.min(AW,AH)*0.18+SHIP_R;
+  return{
+    A:{x:m+20,y:AH/2,angle:0},
+    B:{x:AW-m-20,y:AH/2,angle:Math.PI}
+  };
+}
+
+function resetShips(){
+  const p=spawnPositions();
+  shipA=makeShip(p.A.x,p.A.y,p.A.angle,'A');
+  shipB=makeShip(p.B.x,p.B.y,p.B.angle,'B');
+  bullets=[];torpedoes=[];particles=[];waves=[];
+  updateHUD();
+}
+
+function initWaveDecor(){
+  waves=[];
+  for(let i=0;i<40;i++){
+    waves.push({x:Math.random()*AW,y:Math.random()*AH,r:Math.random()*40+20,phase:Math.random()*Math.PI*2});
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  WEAPONS
+// ═══════════════════════════════════════════════════════
+function fireGun(ship){
+  if(!ship.alive||ship.gunCooldown>0) return;
+  ship.gunCooldown=GUN_COOLDOWN;
+  const dx=Math.cos(ship.angle),dy=Math.sin(ship.angle);
+  const bx=ship.x+dx*(SHIP_LEN*0.5+6), by=ship.y+dy*(SHIP_LEN*0.5+6);
+  bullets.push({x:bx,y:by,vx:dx*GUN_SPEED,vy:dy*GUN_SPEED,owner:ship.side});
+  spawnBurst(bx,by,PAL[ship.side].light,3,90,true);
+}
+
+function fireTorpedoes(ship){
+  if(!ship.alive||ship.torpCooldown>0) return;
+  ship.torpCooldown=TORPEDO_COOLDOWN;
+  const base=ship.angle-Math.PI/2; // port (left) side, relative to heading
+  const spread=[-0.22,0,0.22];
+  for(const off of spread){
+    const a=base+off;
+    const dx=Math.cos(a),dy=Math.sin(a);
+    const launchDist=SHIP_W*0.5+6;
+    const tx=ship.x+Math.cos(base)*launchDist, ty=ship.y+Math.sin(base)*launchDist;
+    torpedoes.push({x:tx,y:ty,vx:dx*TORPEDO_SPEED,vy:dy*TORPEDO_SPEED,owner:ship.side});
+  }
+  spawnBurst(ship.x,ship.y,'#d8f3ff',10,70,false);
+}
+
+// ═══════════════════════════════════════════════════════
+//  PARTICLES
+// ═══════════════════════════════════════════════════════
+function spawnBurst(x,y,col,count,spread,tiny){
+  for(let i=0;i<count;i++){
+    const a=Math.random()*Math.PI*2;
+    const spd=Math.random()*spread+15;
+    particles.push({x,y,vx:Math.cos(a)*spd,vy:Math.sin(a)*spd,life:tiny?200:460,maxLife:tiny?200:460,sz:tiny?2:Math.random()*4+2,col});
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  UPDATE
+// ═══════════════════════════════════════════════════════
+function updateShip(ship,dt){
+  if(!ship.alive) return;
+  const sec=dt/1000;
+  const ctrl=netInput[ship.side];
+
+  if(ship.gunCooldown>0) ship.gunCooldown=Math.max(0,ship.gunCooldown-dt);
+  if(ship.torpCooldown>0) ship.torpCooldown=Math.max(0,ship.torpCooldown-dt);
+  if(ship.blink>0) ship.blink=Math.max(0,ship.blink-dt);
+
+  if(ctrl.gunHeld) fireGun(ship);
+
+  if(ctrl.thrust){
+    const norm=Math.max(-1,Math.min(1,ctrl.angle/MAX_WHEEL_DEG));
+    ship.angle+=norm*TURN_RATE*sec;
+
+    const dx=Math.cos(ship.angle)*SHIP_SPEED*sec;
+    const dy=Math.sin(ship.angle)*SHIP_SPEED*sec;
+    ship.x=Math.max(SHIP_R,Math.min(AW-SHIP_R,ship.x+dx));
+    ship.y=Math.max(SHIP_R,Math.min(AH-SHIP_R,ship.y+dy));
+
+    ship.trailT-=dt;
+    if(ship.trailT<=0){
+      ship.trailT=90;
+      const bx=ship.x-Math.cos(ship.angle)*SHIP_LEN*0.5, by=ship.y-Math.sin(ship.angle)*SHIP_LEN*0.5;
+      particles.push({x:bx,y:by,vx:-Math.cos(ship.angle)*10,vy:-Math.sin(ship.angle)*10,life:700,maxLife:700,sz:5,col:'rgba(216,243,255,0.55)'});
+    }
+  }
+}
+
+function shipTakeDamage(ship,dmg){
+  if(ship.blink>0) return;
+  ship.hp=Math.max(0,ship.hp-dmg);
+  ship.blink=500;
+  updateHUD();
+  if(ship.hp<=0){
+    ship.alive=false;
+    spawnBurst(ship.x,ship.y,'#ffb14a',36,220,false);
+    endMatch(ship.side==='A'?'B':'A');
+  }
+}
+
+function updateGame(dt){
+  if(!gameActive) return;
+  const sec=dt/1000;
+
+  updateShip(shipA,dt);
+  updateShip(shipB,dt);
+
+  // bullets
+  for(let i=bullets.length-1;i>=0;i--){
+    const b=bullets[i];
+    b.x+=b.vx*sec;b.y+=b.vy*sec;
+    if(b.x<-20||b.x>AW+20||b.y<-20||b.y>AH+20){ bullets.splice(i,1); continue; }
+    const target=b.owner==='A'?shipB:shipA;
+    if(target.alive&&Math.hypot(b.x-target.x,b.y-target.y)<SHIP_R*0.7){
+      bullets.splice(i,1);
+      spawnBurst(b.x,b.y,'#ffe27a',10,140,false);
+      shipTakeDamage(target,GUN_DAMAGE);
+    }
+  }
+
+  // torpedoes
+  for(let i=torpedoes.length-1;i>=0;i--){
+    const t=torpedoes[i];
+    t.x+=t.vx*sec;t.y+=t.vy*sec;
+    particles.push({x:t.x,y:t.y,vx:0,vy:0,life:260,maxLife:260,sz:3,col:'rgba(216,243,255,0.4)'});
+    if(t.x<-30||t.x>AW+30||t.y<-30||t.y>AH+30){ torpedoes.splice(i,1); continue; }
+    const target=t.owner==='A'?shipB:shipA;
+    if(target.alive&&Math.hypot(t.x-target.x,t.y-target.y)<SHIP_R*0.75){
+      torpedoes.splice(i,1);
+      spawnBurst(t.x,t.y,'#ff9f45',26,240,false);
+      shipTakeDamage(target,TORPEDO_DAMAGE);
+    }
+  }
+
+  // particles
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i];
+    p.life-=dt;
+    if(p.life<=0){particles.splice(i,1);continue;}
+    p.x+=p.vx*sec;p.y+=p.vy*sec;
+    p.vx*=0.95;p.vy*=0.95;
+  }
+
+  updateHUD();
+}
+
+// ═══════════════════════════════════════════════════════
+//  RENDER
+// ═══════════════════════════════════════════════════════
+function drawShip(ship){
+  if(!ship.alive) return;
+  const pal=PAL[ship.side];
+  ctx.save();
+  ctx.translate(ship.x,ship.y);
+  ctx.rotate(ship.angle);
+  if(ship.blink>0 && Math.floor(ship.blink/80)%2===0) ctx.globalAlpha=0.4;
+
+  const L=SHIP_LEN,W=SHIP_W;
+  // hull
+  ctx.beginPath();
+  ctx.moveTo(L*0.52,0);
+  ctx.bezierCurveTo(L*0.46,W*0.28,L*0.22,W*0.5,L*0.02,W*0.5);
+  ctx.lineTo(-L*0.36,W*0.46);
+  ctx.bezierCurveTo(-L*0.48,W*0.42,-L*0.5,W*0.18,-L*0.5,0);
+  ctx.bezierCurveTo(-L*0.5,-W*0.18,-L*0.48,-W*0.42,-L*0.36,-W*0.46);
+  ctx.lineTo(L*0.02,-W*0.5);
+  ctx.bezierCurveTo(L*0.22,-W*0.5,L*0.46,-W*0.28,L*0.52,0);
+  ctx.closePath();
+  const grad=ctx.createLinearGradient(0,-W*0.5,0,W*0.5);
+  grad.addColorStop(0,'#5c6b7a');grad.addColorStop(0.5,'#38434e');grad.addColorStop(1,'#232a32');
+  ctx.fillStyle=grad;
+  ctx.fill();
+  ctx.lineWidth=1.5;ctx.strokeStyle='#151a1f';ctx.stroke();
+
+  // deck centerline
+  ctx.strokeStyle='rgba(255,255,255,.12)';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(L*0.45,0);ctx.lineTo(-L*0.42,0);ctx.stroke();
+
+  // player-colour trim along the hull edge
+  ctx.strokeStyle=pal.main;ctx.lineWidth=2;
+  ctx.beginPath();
+  ctx.moveTo(L*0.02,W*0.5);ctx.lineTo(-L*0.36,W*0.46);
+  ctx.moveTo(L*0.02,-W*0.5);ctx.lineTo(-L*0.36,-W*0.46);
+  ctx.stroke();
+
+  // superstructure / bridge
+  ctx.fillStyle='#e7f4ff';
+  ctx.fillRect(-L*0.08,-W*0.26,L*0.24,W*0.52);
+  ctx.fillStyle=pal.dark;
+  ctx.fillRect(-L*0.08,-W*0.26,L*0.24,W*0.09);
+
+  // mast
+  ctx.strokeStyle='#8a97a2';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(0,-W*0.9);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(-W*0.16,-W*0.62);ctx.lineTo(W*0.16,-W*0.62);ctx.stroke();
+
+  // bow turret
+  ctx.fillStyle=pal.main;
+  ctx.beginPath();ctx.ellipse(L*0.3,0,W*0.16,W*0.13,0,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle='#0e1114';ctx.lineWidth=1;ctx.stroke();
+  ctx.fillStyle='#0e1114';
+  ctx.fillRect(L*0.3,-W*0.04,W*0.34,W*0.08);
+
+  // stern flag block (side identity)
+  ctx.fillStyle=pal.main;
+  ctx.beginPath();ctx.arc(-L*0.44,0,W*0.14,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#04141f';
+  ctx.font='bold '+(W*0.2)+'px "Baloo 2",sans-serif';
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText(ship.side,-L*0.44,0.5);
+
+  ctx.restore();
+  ctx.globalAlpha=1;
+}
+
+function render(){
+  ctx.clearRect(0,0,AW,AH);
+  const g=ctx.createLinearGradient(0,0,0,AH);
+  g.addColorStop(0,'#052033');g.addColorStop(1,'#08334a');
+  ctx.fillStyle=g;ctx.fillRect(0,0,AW,AH);
+
+  // subtle wave ripples
+  ctx.strokeStyle='rgba(216,243,255,0.07)';ctx.lineWidth=1;
+  for(const w of waves){
+    ctx.beginPath();
+    ctx.arc(w.x,w.y,w.r,0,Math.PI*2);
+    ctx.stroke();
+  }
+
+  if(!gameActive) return;
+
+  for(const p of particles){
+    ctx.globalAlpha=Math.max(0,p.life/p.maxLife);
+    ctx.fillStyle=p.col;
+    ctx.beginPath();ctx.arc(p.x,p.y,p.sz,0,Math.PI*2);ctx.fill();
+  }
+  ctx.globalAlpha=1;
+
+  for(const t of torpedoes){
+    ctx.save();
+    ctx.translate(t.x,t.y);
+    ctx.rotate(Math.atan2(t.vy,t.vx));
+    ctx.fillStyle='#ff9f45';
+    ctx.fillRect(-7,-2.5,14,5);
+    ctx.restore();
+  }
+  for(const b of bullets){
+    ctx.fillStyle='#ffe27a';
+    ctx.beginPath();ctx.arc(b.x,b.y,3,0,Math.PI*2);ctx.fill();
+  }
+
+  drawShip(shipA);
+  drawShip(shipB);
+}
+
+// ═══════════════════════════════════════════════════════
+//  HUD
+// ═══════════════════════════════════════════════════════
+function updateHUD(){
+  if(!shipA||!shipB) return;
+  document.getElementById('hpA').style.width=(shipA.hp/HP_MAX*100)+'%';
+  document.getElementById('hpvalA').textContent=shipA.hp+'/'+HP_MAX;
+  document.getElementById('hpB').style.width=(shipB.hp/HP_MAX*100)+'%';
+  document.getElementById('hpvalB').textContent=shipB.hp+'/'+HP_MAX;
+
+  renderTorpPips('torpA',shipA,'lA');
+  renderTorpPips('torpB',shipB,'lB');
+}
+
+function renderTorpPips(elId,ship,cls){
+  const el=document.getElementById(elId);
+  el.innerHTML='';
+  const ready=ship.torpCooldown<=0;
+  for(let i=0;i<TORPEDO_COUNT;i++){
+    const pip=document.createElement('div');
+    pip.className='torp-pip'+(ready?' '+cls:'');
+    el.appendChild(pip);
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  GAME LOOP
+// ═══════════════════════════════════════════════════════
+function loop(ts){
+  const dt=Math.min(50,ts-lastTs);
+  lastTs=ts;
+  updateGame(dt);
+  render();
+  requestAnimationFrame(loop);
+}
+
+// ═══════════════════════════════════════════════════════
+//  SCREENS
+// ═══════════════════════════════════════════════════════
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.add('hidden'));
+  document.getElementById(id).classList.remove('hidden');
+}
+
+function endMatch(winnerSide){
+  gameActive=false;
+  const title=document.getElementById('final-title');
+  title.textContent='Player '+winnerSide+' Wins!';
+  title.style.color=winnerSide==='A'?'var(--accentA)':'var(--accentB)';
+  showScreen('screen-gameover');
+}
+
+// ═══════════════════════════════════════════════════════
+//  SOCKET.IO
+// ═══════════════════════════════════════════════════════
+const socket=io();
+let myCode=null;
+
+document.getElementById('btn-create').addEventListener('click',()=>{ socket.emit('create_game'); });
+
+socket.on('game_created',({code})=>{
+  myCode=code;
+  document.getElementById('room-code-display').textContent=code;
+  const origin=window.location.origin;
+  const joinUrl=origin+'/controller.html?code='+code;
+  const qr='https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=8&qzone=1&color=04141f&bgcolor=ffffff&data='+encodeURIComponent(joinUrl);
+  document.getElementById('join-link').textContent=joinUrl;
+  document.getElementById('join-qr').src=qr;
+  showScreen('screen-lobby');
+});
+
+function setDot(dotId,statusId,state){
+  const dot=document.getElementById(dotId),sta=document.getElementById(statusId);
+  dot.classList.remove('on','ready');sta.classList.remove('on','ready');
+  if(state==='ready'){dot.classList.add('ready');sta.textContent='Ready!';}
+  else if(state==='connected'){dot.classList.add('on');sta.textContent='Connected';}
+  else{sta.textContent='Waiting...';}
+}
+
+socket.on('lobby_update',data=>{
+  setDot('dot-a','status-a',data.readyA?'ready':data.A?'connected':'waiting');
+  setDot('dot-b','status-b',data.readyB?'ready':data.B?'connected':'waiting');
+});
+
+socket.on('player_left',({slot})=>{
+  setDot('dot-'+slot.toLowerCase(),'status-'+slot.toLowerCase(),'waiting');
+});
+
+socket.on('game_start',()=>{
+  resize();initWaveDecor();resetShips();
+  gameActive=true;
+  showScreen('screen-home');
+  document.getElementById('screen-home').classList.add('hidden');
+  document.getElementById('screen-lobby').classList.add('hidden');
+  document.getElementById('screen-gameover').classList.add('hidden');
+});
+
+document.getElementById('btn-restart').addEventListener('click',()=>{
+  socket.emit('restart_game',{code:myCode});
+});
+
+socket.on('ctrl_wheel',({slot,angle,thrust})=>{
+  if(netInput[slot]){ netInput[slot].angle=angle; netInput[slot].thrust=thrust; }
+});
+socket.on('ctrl_gun',({slot})=>{
+  // held-state is approximated: mark gunHeld true briefly; the controller
+  // re-sends this at a steady rate while the button is held.
+  if(netInput[slot]){
+    netInput[slot].gunHeld=true;
+    clearTimeout(netInput[slot]._gunT);
+    netInput[slot]._gunT=setTimeout(()=>{ if(netInput[slot]) netInput[slot].gunHeld=false; },220);
+  }
+});
+socket.on('ctrl_torpedo',({slot})=>{
+  const ship=slot==='A'?shipA:shipB;
+  if(ship) fireTorpedoes(ship);
+});
+
+socket.on('host_disconnected',()=>{});
+
+// ═══════════════════════════════════════════════════════
+//  BOOT
+// ═══════════════════════════════════════════════════════
+resize();initWaveDecor();
+showScreen('screen-home');
+requestAnimationFrame(ts=>{lastTs=ts;requestAnimationFrame(loop);});
+</script>
+</body>
+</html>

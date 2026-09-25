@@ -1,0 +1,17 @@
+{
+  "name": "naval-duel",
+  "version": "1.0.0",
+  "description": "NAVAL DUEL - 2 player ship battle. Host displays the sea battle, players steer with a ship's-wheel controller on their phones.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^5.2.1",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3"
+  }
+}

@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Naval Duel — Controller</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@500;600;700;800&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#04141f;
+  --panel:#0c2436;
+  --panel2:#123249;
+  --border:#1f4a63;
+  --accentA:#3fa9ff;
+  --accentB:#ff9f45;
+  --cyan:#66d1ff;
+  --text:#e7f4ff;
+  --textdim:#7f9fb4;
+}
+html,body{
+  height:100%;width:100%;background:var(--bg);color:var(--text);
+  font-family:'Nunito',sans-serif;overflow:hidden;touch-action:none;
+  -webkit-touch-callout:none;-webkit-user-select:none;user-select:none;
+  -webkit-tap-highlight-color:transparent;
+}
+*{-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+
+.screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px}
+.screen.hidden{display:none}
+
+.game-title{font-family:'Baloo 2',sans-serif;font-size:1.5rem;font-weight:800;color:var(--cyan)}
+.sub{font-size:.8rem;color:var(--textdim);text-align:center;font-weight:600;max-width:320px;line-height:1.5}
+
+.code-input-wrap{display:flex;flex-direction:column;align-items:center;gap:8px;width:100%;max-width:280px}
+.code-label{font-size:.68rem;color:var(--textdim);letter-spacing:.04em;font-weight:700}
+#code-input{width:100%;padding:14px 16px;text-align:center;letter-spacing:.3em;background:var(--panel);border:2px solid var(--border);border-radius:16px;color:var(--cyan);font-family:'Baloo 2',sans-serif;font-size:1.6rem;font-weight:700;outline:none}
+#code-input:focus{border-color:var(--cyan)}
+
+.btn{padding:14px 32px;background:var(--cyan);border:none;border-radius:18px;color:#04141f;font-family:'Baloo 2',sans-serif;font-size:.9rem;font-weight:700;cursor:pointer;width:100%;max-width:280px;box-shadow:0 5px 0 #1f7fa3;transition:transform .1s}
+.btn:active{transform:translateY(3px);box-shadow:0 2px 0 #1f7fa3}
+.btn.done{background:#3ddc84;box-shadow:0 5px 0 #23964f}
+#error-msg{font-size:.72rem;color:var(--accentB);min-height:1em;font-weight:700}
+
+.slot-badge{font-family:'Baloo 2',sans-serif;font-size:2.2rem;font-weight:800;padding:14px 36px;border:2px solid var(--cyan);border-radius:20px;color:var(--cyan);background:var(--panel);letter-spacing:.05em}
+.ready-indicator{display:flex;gap:16px;font-size:.7rem;color:var(--textdim);font-weight:700}
+.ri{display:flex;align-items:center;gap:6px}
+.ri-dot{width:10px;height:10px;border-radius:50%;background:var(--border)}
+.ri-dot.on{background:var(--cyan)}
+.ri-dot.ready{background:#3ddc84}
+
+/* ── BATTLE SCREEN ── */
+#battle-screen{justify-content:space-between;padding:14px 10px 22px;gap:6px}
+.battle-topline{font-size:.66rem;color:var(--textdim);font-weight:700;letter-spacing:.03em;text-align:center}
+
+.wheel-wrap{position:relative;width:min(78vw,340px);height:min(78vw,340px);flex-shrink:0;touch-action:none}
+.wheel-wrap img.ring{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+#wheel-graphic{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;transform-origin:50% 50%;transition:filter .15s}
+#wheel-graphic.active path,#wheel-graphic.active circle{filter:drop-shadow(0 0 6px rgba(102,209,255,.75))}
+
+.controls-row{display:flex;gap:10px;width:100%;max-width:420px;justify-content:center;align-items:flex-end}
+.weapon-btn{position:relative;width:44%;max-width:190px;aspect-ratio:171/83;background-size:100% 100%;background-repeat:no-repeat;-webkit-tap-highlight-color:transparent;transition:transform .08s,filter .12s}
+.weapon-btn:active{transform:scale(0.94)}
+.weapon-btn.cooldown{filter:grayscale(0.75) brightness(0.55);pointer-events:none}
+.weapon-btn.firing{filter:brightness(1.35) saturate(1.3)}
+#gun-btn{background-image:url('assets/single-shot.svg')}
+#torp-btn{background-image:url('assets/triple-shot.svg')}
+.weapon-label{position:absolute;bottom:-18px;left:0;right:0;text-align:center;font-size:.6rem;font-weight:700;color:var(--textdim);letter-spacing:.03em}
+.torp-cd-ring{position:absolute;inset:0;pointer-events:none}
+
+#conn-banner{position:fixed;top:0;left:0;right:0;z-index:9999;background:var(--accentB);color:#04141f;text-align:center;font-size:.75rem;font-weight:700;padding:8px 0;display:none}
+</style>
+</head>
+<body>
+
+<div id="conn-banner"></div>
+
+<!-- SCREEN 1: JOIN -->
+<div class="screen" id="join-screen">
+  <div class="game-title">Naval Duel</div>
+  <div class="sub">Enter the code shown on the TV/computer to connect your phone as your ship's wheel.</div>
+  <div class="code-input-wrap">
+    <div class="code-label">ROOM CODE</div>
+    <input id="code-input" maxlength="6" inputmode="numeric" pattern="[0-9]*" placeholder="000000"/>
+  </div>
+  <button class="btn" id="join-btn">Connect</button>
+  <div id="error-msg"></div>
+</div>
+
+<!-- SCREEN 2: LOBBY -->
+<div class="screen hidden" id="lobby-screen">
+  <div class="slot-badge" id="my-slot-badge">Player A</div>
+  <div class="sub" id="lobby-status">Waiting for other player...</div>
+  <div class="ready-indicator">
+    <div class="ri"><div class="ri-dot" id="dot-a"></div><span>A</span></div>
+    <div class="ri"><div class="ri-dot" id="dot-b"></div><span>B</span></div>
+  </div>
+  <button class="btn" id="ready-btn">Ready Up</button>
+</div>
+
+<!-- SCREEN 3: BATTLE (wheel controller) -->
+<div class="screen hidden" id="battle-screen">
+  <div class="battle-topline" id="battle-status">Hold the wheel to sail</div>
+
+  <div class="wheel-wrap" id="wheel-wrap">
+    <img class="ring" src="assets/degrees.svg" alt="heading dial" draggable="false"/>
+    <div id="wheel-graphic"></div>
+  </div>
+
+  <div class="controls-row">
+    <div class="weapon-btn" id="gun-btn"><div class="weapon-label">MACHINE GUN</div></div>
+    <div class="weapon-btn" id="torp-btn"><div class="weapon-label">TORPEDOES (3)</div></div>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+'use strict';
+
+// ── inline the steering-wheel SVG so we can rotate it directly ──
+fetch('assets/steering-wheel.svg').then(r=>r.text()).then(svg=>{
+  document.getElementById('wheel-graphic').innerHTML=svg;
+  const svgEl=document.getElementById('wheel-graphic').querySelector('svg');
+  if(svgEl){ svgEl.style.width='100%'; svgEl.style.height='100%'; svgEl.style.display='block'; }
+});
+
+// ═══════════════════════════════════════════════════════
+//  SOCKET
+// ═══════════════════════════════════════════════════════
+const socket=io({ transports:['websocket'] });
+let mySlot=null, myCode=null, gameStarted=false;
+
+const joinScreen=document.getElementById('join-screen');
+const lobbyScreen=document.getElementById('lobby-screen');
+const battleScreen=document.getElementById('battle-screen');
+const codeInput=document.getElementById('code-input');
+const errorMsg=document.getElementById('error-msg');
+
+function showScreen(name){
+  joinScreen.classList.toggle('hidden',name!=='join');
+  lobbyScreen.classList.toggle('hidden',name!=='lobby');
+  battleScreen.classList.toggle('hidden',name!=='battle');
+}
+
+document.getElementById('join-btn').addEventListener('click',()=>doJoin());
+codeInput.addEventListener('keydown',e=>{if(e.key==='Enter') doJoin();});
+
+{
+  const urlCode=new URLSearchParams(window.location.search).get('code');
+  if(urlCode&&/^\d{6}$/.test(urlCode)){ codeInput.value=urlCode; doJoin(); }
+}
+
+function doJoin(){
+  const code=codeInput.value.trim();
+  if(code.length!==6){errorMsg.textContent='Enter the 6-digit code';return;}
+  errorMsg.textContent='';
+  socket.emit('join_game',{code});
+  myCode=code;
+}
+
+socket.on('join_error',msg=>{ errorMsg.textContent=msg; });
+
+const readyBtn=document.getElementById('ready-btn');
+let isReady=false;
+readyBtn.addEventListener('click',()=>{
+  if(isReady) return;
+  isReady=true;
+  readyBtn.textContent='Standing By...';
+  readyBtn.classList.add('done');
+  socket.emit('player_ready',{code:myCode});
+});
+
+socket.on('joined',({slot,code})=>{
+  hideConnBanner();
+  mySlot=slot;myCode=code;
+  document.getElementById('my-slot-badge').textContent='Player '+slot;
+  if(!gameStarted){
+    isReady=false;
+    readyBtn.textContent='Ready Up';
+    readyBtn.classList.remove('done');
+    document.getElementById('lobby-status').textContent='Waiting for other player...';
+    updateReadyDots({A:false,B:false},{A:false,B:false});
+    showScreen('lobby');
+  }
+});
+
+socket.on('lobby_update',data=>{
+  updateReadyDots({A:data.A,B:data.B},{A:data.readyA,B:data.readyB});
+  if(data.A&&data.B){
+    document.getElementById('lobby-status').textContent='Both captains aboard — ready up!';
+  }
+});
+
+function updateReadyDots(present,ready){
+  document.getElementById('dot-a').className='ri-dot'+(present.A?' on':'');
+  document.getElementById('dot-b').className='ri-dot'+(present.B?' on':'');
+  if(ready.A) document.getElementById('dot-a').style.background='#3ddc84';
+  if(ready.B) document.getElementById('dot-b').style.background='#3ddc84';
+}
+
+socket.on('game_start',()=>{
+  isReady=false;
+  gameStarted=true;
+  showScreen('battle');
+});
+
+socket.on('host_disconnected',()=>{ alert('Host disconnected. Please refresh the page.'); });
+
+// ── RECONNECTION ──
+const connBanner=document.getElementById('conn-banner');
+function showConnBanner(msg){ connBanner.textContent=msg; connBanner.style.display='block'; }
+function hideConnBanner(){ connBanner.style.display='none'; }
+socket.on('disconnect',()=>{ if(mySlot&&myCode) showConnBanner('Connection lost — reconnecting...'); });
+socket.io.on('reconnect',()=>{ if(mySlot&&myCode) socket.emit('rejoin_game',{code:myCode,slot:mySlot}); });
+socket.on('connect',()=>{ if(mySlot&&myCode) socket.emit('rejoin_game',{code:myCode,slot:mySlot}); });
+
+setInterval(()=>{
+  const start=performance.now();
+  socket.emit('ping_check',()=>{ /* latency probe */ });
+},5000);
+
+// ═══════════════════════════════════════════════════════
+//  SHIP'S WHEEL — drag around the dial to rotate it; holding
+//  it (anywhere on the dial) makes the ship sail forward.
+// ═══════════════════════════════════════════════════════
+const MAX_WHEEL_DEG=150;   // physical stop, matches host's turn clamp with a little overtravel
+const wheelWrap=document.getElementById('wheel-wrap');
+const wheelGraphic=document.getElementById('wheel-graphic');
+
+let wheelAngle=0;      // degrees, 0 = neutral (arrow up)
+let isTouching=false;
+let dragStartTouchAngle=0;
+let dragStartWheelAngle=0;
+let activePointerId=null;
+
+function angleFromCenter(clientX,clientY){
+  const rect=wheelWrap.getBoundingClientRect();
+  const cx=rect.left+rect.width/2, cy=rect.top+rect.height/2;
+  const dx=clientX-cx, dy=clientY-cy;
+  return Math.atan2(dy,dx)*180/Math.PI;
+}
+
+function shortestDelta(from,to){
+  let d=to-from;
+  while(d>180) d-=360;
+  while(d<-180) d+=360;
+  return d;
+}
+
+function applyWheelVisual(){
+  wheelGraphic.style.transform='rotate('+wheelAngle+'deg)';
+}
+
+wheelWrap.addEventListener('pointerdown',e=>{
+  if(activePointerId!==null) return;
+  activePointerId=e.pointerId;
+  wheelWrap.setPointerCapture(e.pointerId);
+  isTouching=true;
+  wheelGraphic.classList.add('active');
+  dragStartTouchAngle=angleFromCenter(e.clientX,e.clientY);
+  dragStartWheelAngle=wheelAngle;
+  document.getElementById('battle-status').textContent='Sailing...';
+});
+
+wheelWrap.addEventListener('pointermove',e=>{
+  if(e.pointerId!==activePointerId||!isTouching) return;
+  const touchAngle=angleFromCenter(e.clientX,e.clientY);
+  const delta=shortestDelta(dragStartTouchAngle,touchAngle);
+  let next=dragStartWheelAngle+delta;
+  next=Math.max(-MAX_WHEEL_DEG,Math.min(MAX_WHEEL_DEG,next));
+  wheelAngle=next;
+  applyWheelVisual();
+});
+
+function releaseWheel(e){
+  if(e&&e.pointerId!==activePointerId) return;
+  isTouching=false;
+  activePointerId=null;
+  wheelGraphic.classList.remove('active');
+  document.getElementById('battle-status').textContent='Hold the wheel to sail';
+}
+wheelWrap.addEventListener('pointerup',releaseWheel);
+wheelWrap.addEventListener('pointercancel',releaseWheel);
+wheelWrap.addEventListener('pointerleave',e=>{ /* pointer capture keeps drag alive even off-element */ });
+
+// send wheel state to host at a steady rate
+setInterval(()=>{
+  if(!myCode||!mySlot) return;
+  socket.emit('ctrl_wheel',{code:myCode,slot:mySlot,angle:wheelAngle,thrust:isTouching});
+},40);
+
+// release input if the tab is hidden mid-battle
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden){ isTouching=false; wheelGraphic.classList.remove('active'); }
+});
+
+// ═══════════════════════════════════════════════════════
+//  MACHINE GUN — forward only, fires while held
+// ═══════════════════════════════════════════════════════
+const gunBtn=document.getElementById('gun-btn');
+let gunInterval=null;
+function startGun(){
+  if(gunInterval) return;
+  fireGunOnce();
+  gunInterval=setInterval(fireGunOnce,150);
+  gunBtn.classList.add('firing');
+}
+function fireGunOnce(){
+  if(!myCode||!mySlot) return;
+  socket.emit('ctrl_gun',{code:myCode,slot:mySlot});
+}
+function stopGun(){
+  if(gunInterval){ clearInterval(gunInterval); gunInterval=null; }
+  gunBtn.classList.remove('firing');
+}
+gunBtn.addEventListener('pointerdown',e=>{ e.preventDefault(); startGun(); });
+gunBtn.addEventListener('pointerup',stopGun);
+gunBtn.addEventListener('pointercancel',stopGun);
+gunBtn.addEventListener('pointerleave',stopGun);
+
+// ═══════════════════════════════════════════════════════
+//  TORPEDOES — 3-shot broadside salvo off the port (left) side,
+//  fires once per tap with a cooldown (mirrors the host's timer)
+// ═══════════════════════════════════════════════════════
+const TORPEDO_COOLDOWN_MS=3600;
+const torpBtn=document.getElementById('torp-btn');
+let torpReady=true;
+torpBtn.addEventListener('pointerdown',e=>{
+  e.preventDefault();
+  if(!torpReady||!myCode||!mySlot) return;
+  socket.emit('ctrl_torpedo',{code:myCode,slot:mySlot});
+  torpReady=false;
+  torpBtn.classList.add('cooldown');
+  setTimeout(()=>{ torpReady=true; torpBtn.classList.remove('cooldown'); },TORPEDO_COOLDOWN_MS);
+});
+
+applyWheelVisual();
+</script>
+</body>
+</html>
