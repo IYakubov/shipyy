@@ -2,226 +2,419 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#cfcdc6">
 <title>Naval Duel — Controller</title>
+<link rel="stylesheet" href="fonts/fonts.css">
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@500;600;700;800&display=swap');
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#04141f;
-  --panel:#0c2436;
-  --panel2:#123249;
-  --border:#1f4a63;
-  --accentA:#3fa9ff;
-  --accentB:#ff9f45;
-  --cyan:#66d1ff;
-  --text:#e7f4ff;
-  --textdim:#7f9fb4;
+  --soil:#cfcdc6;--slab:#dddbd4;--paper:#ecebe6;--ink:#1b1b1a;--navy:#1A4361;
+  --dim:#6f6d67;--line:rgba(27,27,26,.16);
+  --good:#bcc8b3;--good-ink:#4f6a48;--bad:#d6bdb6;--bad-ink:#7a3b33;
+  --pc:var(--ink);          /* player colour, set to navy for B */
+  --pc-edge:#000;
 }
+body.B{--pc:var(--navy);--pc-edge:#0d2536}
 html,body{
-  height:100%;width:100%;background:var(--bg);color:var(--text);
-  font-family:'Nunito',sans-serif;overflow:hidden;touch-action:none;
+  height:100%;width:100%;background:var(--soil);color:var(--ink);
+  font-family:'Unbounded',system-ui,sans-serif;overflow:hidden;touch-action:none;
   -webkit-touch-callout:none;-webkit-user-select:none;user-select:none;
   -webkit-tap-highlight-color:transparent;
 }
 *{-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
 
-.screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px}
+.screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:28px}
 .screen.hidden{display:none}
 
-.game-title{font-family:'Baloo 2',sans-serif;font-size:1.5rem;font-weight:800;color:var(--cyan)}
-.sub{font-size:.8rem;color:var(--textdim);text-align:center;font-weight:600;max-width:320px;line-height:1.5}
+.eyebrow{font-size:.56rem;font-weight:600;letter-spacing:.24em;text-transform:uppercase;color:var(--dim)}
+.title{font-size:1.9rem;font-weight:850;letter-spacing:-.01em;text-align:center;line-height:1}
+.sub{font-size:.66rem;color:var(--dim);text-align:center;line-height:1.7;max-width:290px}
 
-.code-input-wrap{display:flex;flex-direction:column;align-items:center;gap:8px;width:100%;max-width:280px}
-.code-label{font-size:.68rem;color:var(--textdim);letter-spacing:.04em;font-weight:700}
-#code-input{width:100%;padding:14px 16px;text-align:center;letter-spacing:.3em;background:var(--panel);border:2px solid var(--border);border-radius:16px;color:var(--cyan);font-family:'Baloo 2',sans-serif;font-size:1.6rem;font-weight:700;outline:none}
-#code-input:focus{border-color:var(--cyan)}
+/* join */
+#code-input{width:100%;max-width:280px;padding:16px;text-align:center;letter-spacing:.32em;background:var(--paper);border:1px solid var(--line);border-radius:14px;color:var(--ink);font-family:inherit;font-size:1.4rem;font-weight:700;outline:none;-webkit-user-select:text;user-select:text}
+#code-input:focus{border-color:var(--ink)}
+#code-input::placeholder{color:#b5b3ac}
+.btn{width:100%;max-width:280px;padding:18px 24px;border:none;border-radius:14px;background:var(--pc);color:var(--paper);font-family:inherit;font-size:.74rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;box-shadow:0 5px 0 var(--pc-edge);transition:transform .08s,box-shadow .08s}
+.btn:active{transform:translateY(4px);box-shadow:0 1px 0 var(--pc-edge)}
+.btn.done{background:var(--good);color:var(--good-ink);box-shadow:0 5px 0 #9fae95}
+#error-msg{font-size:.6rem;font-weight:600;letter-spacing:.06em;color:var(--bad-ink);min-height:1em;text-align:center}
 
-.btn{padding:14px 32px;background:var(--cyan);border:none;border-radius:18px;color:#04141f;font-family:'Baloo 2',sans-serif;font-size:.9rem;font-weight:700;cursor:pointer;width:100%;max-width:280px;box-shadow:0 5px 0 #1f7fa3;transition:transform .1s}
-.btn:active{transform:translateY(3px);box-shadow:0 2px 0 #1f7fa3}
-.btn.done{background:#3ddc84;box-shadow:0 5px 0 #23964f}
-#error-msg{font-size:.72rem;color:var(--accentB);min-height:1em;font-weight:700}
+/* lobby */
+.me{display:flex;flex-direction:column;align-items:center;gap:14px}
+.me-tile{width:112px;height:112px;border-radius:28px;background:var(--pc);color:var(--paper);display:flex;align-items:center;justify-content:center;font-size:3.4rem;font-weight:850;box-shadow:0 7px 0 var(--pc-edge)}
+.me-name{font-size:.8rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
+.pair{display:flex;gap:10px}
+.pp{display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:12px;background:var(--slab);border:1px solid var(--line);font-size:.56rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--dim)}
+.pp i{width:10px;height:10px;border-radius:3px;background:var(--ink);opacity:.25}
+.pp.B i{background:var(--navy)}
+.pp.on i{opacity:1}
+.pp.ready{background:var(--good);color:var(--good-ink)}
+.pp.ready i{opacity:1}
 
-.slot-badge{font-family:'Baloo 2',sans-serif;font-size:2.2rem;font-weight:800;padding:14px 36px;border:2px solid var(--cyan);border-radius:20px;color:var(--cyan);background:var(--panel);letter-spacing:.05em}
-.ready-indicator{display:flex;gap:16px;font-size:.7rem;color:var(--textdim);font-weight:700}
-.ri{display:flex;align-items:center;gap:6px}
-.ri-dot{width:10px;height:10px;border-radius:50%;background:var(--border)}
-.ri-dot.on{background:var(--cyan)}
-.ri-dot.ready{background:#3ddc84}
+/* ═══ BATTLE (landscape) ═══ */
+#battle-screen{padding:0;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto 1fr;gap:0;align-items:stretch;justify-content:stretch;
+  padding:max(10px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
+#battle-screen.hidden{display:none}
+.hud{grid-column:1/3;display:flex;align-items:center;justify-content:space-between;gap:12px;height:30px}
+.chip{display:flex;align-items:center;gap:8px;font-size:.56rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase}
+.chip b{width:22px;height:22px;border-radius:7px;background:var(--pc);color:var(--paper);display:flex;align-items:center;justify-content:center;font-size:.66rem;font-weight:800}
+.battle-topline{font-size:.54rem;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);text-align:center}
+.net{width:8px;height:8px;border-radius:50%;background:var(--good-ink)}
+.net.off{background:var(--bad-ink)}
 
-/* ── BATTLE SCREEN ── */
-#battle-screen{justify-content:space-between;padding:14px 10px 22px;gap:6px}
-.battle-topline{font-size:.66rem;color:var(--textdim);font-weight:700;letter-spacing:.03em;text-align:center}
+/* — wheel zone (left): the wheel itself is untouched, only recoloured — */
+.helm{display:flex;align-items:center;justify-content:center;min-height:0;position:relative}
+.wheel-wrap{position:relative;width:min(44vw,calc(100vh - 70px),400px);height:min(44vw,calc(100vh - 70px),400px);flex-shrink:0;touch-action:none;color:var(--pc)}
+.wheel-wrap .ring{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.wheel-wrap .ring svg{width:100%;height:100%;display:block}
+.dial-face{fill:var(--paper);stroke:var(--slab);stroke-width:4;transition:fill .15s}
+.wheel-wrap:has(#wheel-graphic.active) .dial-face{fill:#e4e2dc}
+#wheel-graphic{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;transform-origin:50% 50%}
+.helm-cap{position:absolute;left:0;right:0;bottom:0;text-align:center;font-size:.5rem;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--dim)}
 
-.wheel-wrap{position:relative;width:min(78vw,340px);height:min(78vw,340px);flex-shrink:0;touch-action:none}
-.wheel-wrap img.ring{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
-#wheel-graphic{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;transform-origin:50% 50%;transition:filter .15s}
-#wheel-graphic.active path,#wheel-graphic.active circle{filter:drop-shadow(0 0 6px rgba(102,209,255,.75))}
+/* — weapons zone (right) — */
+.weapons{position:relative;min-height:0}
+.fire{position:absolute;display:flex;flex-direction:column;align-items:center;gap:12px;touch-action:none}
+#gun-btn{--sz:min(42vh,23vw,190px);right:4%;bottom:6%}
+#torp-btn{--sz:min(33vh,18vw,150px);left:6%;top:2%}
+.knob{position:relative;width:var(--sz);height:var(--sz)}
+.knob::before{content:'';position:absolute;inset:0;border-radius:50%;background:var(--pc-edge);transform:translateY(7px)}
+.face{position:absolute;inset:0;border-radius:50%;background:var(--slab);border:2px solid var(--pc);color:var(--pc);display:flex;align-items:center;justify-content:center;overflow:hidden;transition:transform .07s,background .1s,color .1s}
+.face .ticks{position:absolute;inset:7%;width:86%;height:86%}
+.face .icon{position:relative;width:46%;height:46%}
+.fire.down .face{transform:translateY(6px)}
+/* gun held: face inverts to player colour and the tick ring spins */
+#gun-btn.firing .face{background:var(--pc);color:var(--paper)}
+#gun-btn.firing .ticks{animation:spin .55s linear infinite}
+#gun-btn.firing .icon{animation:kick .15s steps(2) infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes kick{50%{transform:translateY(5%)}}
+/* torpedo cooldown: a sweep fills back around the face */
+.sweep{position:absolute;inset:0;border-radius:50%;background:conic-gradient(transparent calc(var(--p,1)*360deg),rgba(27,27,26,.22) 0);pointer-events:none}
+#torp-btn.cooldown .icon{opacity:.35}
+#torp-btn.cooldown .ticks{opacity:.4}
+.ping{position:absolute;inset:-2px;border-radius:50%;border:3px solid var(--pc);opacity:0;pointer-events:none}
+#torp-btn.pinged .ping{animation:ping .55s ease-out}
+@keyframes ping{0%{opacity:.8;transform:scale(1)}100%{opacity:0;transform:scale(1.35)}}
+.cap{font-size:.5rem;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);white-space:nowrap;display:flex;gap:8px;align-items:center}
+.cap b{font-weight:700;color:var(--ink)}
+.cap .st{padding:3px 7px;border-radius:6px;background:var(--paper);color:var(--ink)}
+.cap .st.wait{background:transparent;color:var(--dim);border:1px solid var(--line)}
 
-.controls-row{display:flex;gap:10px;width:100%;max-width:420px;justify-content:center;align-items:flex-end}
-.weapon-btn{position:relative;width:44%;max-width:190px;aspect-ratio:171/83;background-size:100% 100%;background-repeat:no-repeat;-webkit-tap-highlight-color:transparent;transition:transform .08s,filter .12s}
-.weapon-btn:active{transform:scale(0.94)}
-.weapon-btn.cooldown{filter:grayscale(0.75) brightness(0.55);pointer-events:none}
-.weapon-btn.firing{filter:brightness(1.35) saturate(1.3)}
-#gun-btn{background-image:url('assets/single-shot.svg')}
-#torp-btn{background-image:url('assets/triple-shot.svg')}
-.weapon-label{position:absolute;bottom:-18px;left:0;right:0;text-align:center;font-size:.6rem;font-weight:700;color:var(--textdim);letter-spacing:.03em}
-.torp-cd-ring{position:absolute;inset:0;pointer-events:none}
+/* mirrored menu overlay */
+#menu-ov{position:fixed;inset:0;z-index:50;background:rgba(207,205,198,.94);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:20px}
+#menu-ov.hidden{display:none}
+#menu-title{font-size:1.5rem;font-weight:850;text-align:center}
+.mlist{display:flex;flex-direction:column;gap:9px;width:min(340px,80vw)}
+.mi{padding:16px 20px;border-radius:13px;background:var(--paper);border:1px solid var(--line);font-size:.68rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;display:flex;justify-content:space-between;align-items:center;transition:transform .08s}
+.mi:active{transform:scale(.98)}
+.mi.focus{background:var(--ink);color:var(--paper)}
+.mlist.locked .mi{opacity:.5}
 
-#conn-banner{position:fixed;top:0;left:0;right:0;z-index:9999;background:var(--accentB);color:#04141f;text-align:center;font-size:.75rem;font-weight:700;padding:8px 0;display:none}
+/* portrait warning — the joystick screen needs landscape */
+#rotate{position:fixed;inset:0;z-index:60;background:var(--soil);display:none;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:30px}
+#rotate .phone{width:46px;height:78px;border:3px solid var(--ink);border-radius:10px;animation:turn 1.8s ease-in-out infinite}
+@keyframes turn{0%,20%{transform:rotate(0)}55%,80%{transform:rotate(-90deg)}100%{transform:rotate(0)}}
+@media (orientation:portrait){ body.in-battle #rotate{display:flex} }
+
+#conn-banner{position:fixed;top:0;left:0;right:0;z-index:9999;background:var(--bad);color:var(--bad-ink);text-align:center;font-size:.56rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:9px 0;display:none}
 </style>
 </head>
 <body>
 
 <div id="conn-banner"></div>
 
-<!-- SCREEN 1: JOIN -->
+<!-- JOIN -->
 <div class="screen" id="join-screen">
-  <div class="game-title">Naval Duel</div>
-  <div class="sub">Enter the code shown on the TV/computer to connect your phone as your ship's wheel.</div>
-  <div class="code-input-wrap">
-    <div class="code-label">ROOM CODE</div>
-    <input id="code-input" maxlength="6" inputmode="numeric" pattern="[0-9]*" placeholder="000000"/>
-  </div>
+  <div class="eyebrow">Controller</div>
+  <div class="title">Naval Duel</div>
+  <div class="sub">Enter the room number from the big screen, or scan its QR code.</div>
+  <input id="code-input" maxlength="6" inputmode="numeric" pattern="[0-9]*" placeholder="000000"/>
   <button class="btn" id="join-btn">Connect</button>
   <div id="error-msg"></div>
 </div>
 
-<!-- SCREEN 2: LOBBY -->
+<!-- LOBBY -->
 <div class="screen hidden" id="lobby-screen">
-  <div class="slot-badge" id="my-slot-badge">Player A</div>
-  <div class="sub" id="lobby-status">Waiting for other player...</div>
-  <div class="ready-indicator">
-    <div class="ri"><div class="ri-dot" id="dot-a"></div><span>A</span></div>
-    <div class="ri"><div class="ri-dot" id="dot-b"></div><span>B</span></div>
+  <div class="me">
+    <div class="me-tile" id="my-slot-tile">A</div>
+    <div class="me-name" id="my-slot-badge">Player A</div>
   </div>
-  <button class="btn" id="ready-btn">Ready Up</button>
+  <div class="sub" id="lobby-status">Waiting for the other captain…</div>
+  <div class="pair">
+    <div class="pp" id="pp-A"><i></i>Player A</div>
+    <div class="pp B" id="pp-B"><i></i>Player B</div>
+  </div>
+  <button class="btn" id="ready-btn">Ready</button>
 </div>
 
-<!-- SCREEN 3: BATTLE (wheel controller) -->
+<!-- BATTLE -->
 <div class="screen hidden" id="battle-screen">
-  <div class="battle-topline" id="battle-status">Hold the wheel to sail</div>
-
-  <div class="wheel-wrap" id="wheel-wrap">
-    <img class="ring" src="assets/degrees.svg" alt="heading dial" draggable="false"/>
-    <div id="wheel-graphic"></div>
+  <div class="hud">
+    <div class="chip"><b id="hud-slot">A</b><span id="hud-name">Player A</span></div>
+    <div class="battle-topline" id="battle-status">Hold the wheel to sail</div>
+    <div class="net" id="net-dot"></div>
   </div>
 
-  <div class="controls-row">
-    <div class="weapon-btn" id="gun-btn"><div class="weapon-label">MACHINE GUN</div></div>
-    <div class="weapon-btn" id="torp-btn"><div class="weapon-label">TORPEDOES (3)</div></div>
+  <div class="helm">
+    <div class="wheel-wrap" id="wheel-wrap">
+      <div class="ring" id="wheel-ring"></div>
+      <div id="wheel-graphic"></div>
+    </div>
+  </div>
+
+  <div class="weapons">
+    <div class="fire" id="torp-btn">
+      <div class="knob">
+        <div class="face">
+          <svg class="ticks" viewBox="0 0 100 100" aria-hidden="true"><g fill="currentColor">
+            <rect x="49" y="0" width="2" height="7" rx="1"/><rect x="49" y="93" width="2" height="7" rx="1"/>
+            <rect x="0" y="49" width="7" height="2" rx="1"/><rect x="93" y="49" width="7" height="2" rx="1"/>
+          </g><circle cx="50" cy="50" r="41" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="2 4" opacity=".5"/></svg>
+          <svg class="icon" viewBox="0 0 64 64" aria-hidden="true"><g fill="currentColor">
+            <g transform="rotate(-24 32 58)"><path d="M29 14c0-4 1.5-7 3-7s3 3 3 7v30h-6z"/><path d="M29 44l-4 7h14l-4-7z"/></g>
+            <g><path d="M29 10c0-4 1.5-7 3-7s3 3 3 7v34h-6z"/><path d="M29 44l-4 8h14l-4-8z"/></g>
+            <g transform="rotate(24 32 58)"><path d="M29 14c0-4 1.5-7 3-7s3 3 3 7v30h-6z"/><path d="M29 44l-4 7h14l-4-7z"/></g>
+          </g></svg>
+          <div class="sweep" id="torp-sweep"></div>
+        </div>
+        <div class="ping"></div>
+      </div>
+      <div class="cap"><b>Torpedoes</b><span class="st" id="torp-st">Ready</span></div>
+    </div>
+
+    <div class="fire" id="gun-btn">
+      <div class="knob">
+        <div class="face">
+          <svg class="ticks" viewBox="0 0 100 100" aria-hidden="true"><g fill="currentColor">
+            <rect x="49" y="0" width="2" height="9" rx="1"/><rect x="49" y="91" width="2" height="9" rx="1"/>
+            <rect x="0" y="49" width="9" height="2" rx="1"/><rect x="91" y="49" width="9" height="2" rx="1"/>
+            <rect x="49" y="0" width="2" height="5" rx="1" transform="rotate(45 50 50)"/><rect x="49" y="95" width="2" height="5" rx="1" transform="rotate(45 50 50)"/>
+            <rect x="0" y="49" width="5" height="2" rx="1" transform="rotate(45 50 50)"/><rect x="95" y="49" width="5" height="2" rx="1" transform="rotate(45 50 50)"/>
+          </g><circle cx="50" cy="50" r="40" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="10 5.7"/></svg>
+          <svg class="icon" viewBox="0 0 64 64" aria-hidden="true"><g fill="currentColor">
+            <path d="M26 22c0-9 3-15 6-15s6 6 6 15v4H26z"/><rect x="26" y="29" width="12" height="20" rx="1.5"/><rect x="24" y="52" width="16" height="5" rx="1.5"/>
+          </g></svg>
+        </div>
+      </div>
+      <div class="cap"><b>Machine gun</b><span>Hold</span></div>
+    </div>
   </div>
 </div>
+
+<!-- REPLACED / HOST LEFT -->
+<div class="screen hidden" id="info-screen">
+  <div class="eyebrow" id="info-eyebrow">Disconnected</div>
+  <div class="title" id="info-title">Host left</div>
+  <div class="sub" id="info-sub">The big screen closed the game. Scan the new QR code to play again.</div>
+</div>
+
+<!-- MENU MIRROR -->
+<div id="menu-ov" class="hidden">
+  <div class="eyebrow" id="menu-eyebrow">Battle over</div>
+  <div id="menu-title">Player A wins</div>
+  <div class="mlist locked" id="mlist"></div>
+</div>
+
+<div id="rotate"><div class="phone"></div><div class="sub">Turn your phone sideways to take the helm</div></div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
 'use strict';
 
-// ── inline the steering-wheel SVG so we can rotate it directly ──
+// ── inline the dial and steering-wheel SVGs so they follow the player colour
+//    (the wheel is rotated directly, exactly as before) ──
+fetch('assets/degrees.svg').then(r=>r.text()).then(svg=>{
+  document.getElementById('wheel-ring').innerHTML=svg;
+});
 fetch('assets/steering-wheel.svg').then(r=>r.text()).then(svg=>{
   document.getElementById('wheel-graphic').innerHTML=svg;
   const svgEl=document.getElementById('wheel-graphic').querySelector('svg');
   if(svgEl){ svgEl.style.width='100%'; svgEl.style.height='100%'; svgEl.style.display='block'; }
 });
 
+function buzz(ms){ try{ if(navigator.vibrate) navigator.vibrate(ms); }catch(e){} }
+
 // ═══════════════════════════════════════════════════════
-//  SOCKET
+//  SOCKET + ONE PHONE = ONE SLOT
 // ═══════════════════════════════════════════════════════
 const socket=io({ transports:['websocket'] });
-let mySlot=null, myCode=null, gameStarted=false;
+let mySlot=null, myCode=null, gameStarted=false, retired=false;
 
-const joinScreen=document.getElementById('join-screen');
-const lobbyScreen=document.getElementById('lobby-screen');
-const battleScreen=document.getElementById('battle-screen');
-const codeInput=document.getElementById('code-input');
-const errorMsg=document.getElementById('error-msg');
+function getClientId(){
+  let id=null;
+  try{ id=localStorage.getItem('navalduel_client'); }catch(e){}
+  if(!id){
+    id=(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2));
+    try{ localStorage.setItem('navalduel_client',id); }catch(e){}
+  }
+  return id;
+}
+const clientId=getClientId();
 
+const screens=['join','lobby','battle','info'];
 function showScreen(name){
-  joinScreen.classList.toggle('hidden',name!=='join');
-  lobbyScreen.classList.toggle('hidden',name!=='lobby');
-  battleScreen.classList.toggle('hidden',name!=='battle');
+  for(const s of screens) document.getElementById(s+'-screen').classList.toggle('hidden',s!==name);
+  document.body.classList.toggle('in-battle',name==='battle');
 }
 
+const codeInput=document.getElementById('code-input');
+const errorMsg=document.getElementById('error-msg');
 document.getElementById('join-btn').addEventListener('click',()=>doJoin());
 codeInput.addEventListener('keydown',e=>{if(e.key==='Enter') doJoin();});
 
-{
-  const urlCode=new URLSearchParams(window.location.search).get('code');
-  if(urlCode&&/^\d{6}$/.test(urlCode)){ codeInput.value=urlCode; doJoin(); }
-}
-
 function doJoin(){
   const code=codeInput.value.trim();
-  if(code.length!==6){errorMsg.textContent='Enter the 6-digit code';return;}
+  if(!/^\d{6}$/.test(code)){errorMsg.textContent='Enter the 6-digit room number';return;}
   errorMsg.textContent='';
-  socket.emit('join_game',{code});
   myCode=code;
+  socket.emit('join_game',{code,clientId});
 }
 
-socket.on('join_error',msg=>{ errorMsg.textContent=msg; });
+// Auto-join from the QR link — but only once the page is actually visible,
+// so a scanner app's hidden preview can't grab a slot.
+{
+  const urlCode=new URLSearchParams(window.location.search).get('code');
+  if(urlCode&&/^\d{6}$/.test(urlCode)){
+    codeInput.value=urlCode;
+    const go=()=>{ if(document.visibilityState==='visible'&&!mySlot&&!retired){ document.removeEventListener('visibilitychange',go); doJoin(); } };
+    if(document.visibilityState==='visible') doJoin(); else document.addEventListener('visibilitychange',go);
+  }
+}
+
+socket.on('join_error',msg=>{ errorMsg.textContent=msg; showScreen('join'); });
 
 const readyBtn=document.getElementById('ready-btn');
 let isReady=false;
 readyBtn.addEventListener('click',()=>{
   if(isReady) return;
   isReady=true;
-  readyBtn.textContent='Standing By...';
+  readyBtn.textContent='Standing by';
   readyBtn.classList.add('done');
+  buzz(15);
   socket.emit('player_ready',{code:myCode});
+  goLandscape();
 });
+
+// best effort: fullscreen + landscape lock (Android Chrome); ignored elsewhere
+function goLandscape(){
+  try{
+    const el=document.documentElement;
+    const p=el.requestFullscreen?el.requestFullscreen({navigationUI:'hide'}):null;
+    if(p&&p.then) p.then(()=>{ try{ screen.orientation.lock('landscape').catch(()=>{}); }catch(e){} }).catch(()=>{});
+  }catch(e){}
+}
+
+function resetLobby(){
+  isReady=false;
+  readyBtn.textContent='Ready';
+  readyBtn.classList.remove('done');
+}
 
 socket.on('joined',({slot,code})=>{
   hideConnBanner();
   mySlot=slot;myCode=code;
+  document.body.classList.toggle('B',slot==='B');
+  document.getElementById('my-slot-tile').textContent=slot;
   document.getElementById('my-slot-badge').textContent='Player '+slot;
-  if(!gameStarted){
-    isReady=false;
-    readyBtn.textContent='Ready Up';
-    readyBtn.classList.remove('done');
-    document.getElementById('lobby-status').textContent='Waiting for other player...';
-    updateReadyDots({A:false,B:false},{A:false,B:false});
-    showScreen('lobby');
-  }
+  document.getElementById('hud-slot').textContent=slot;
+  document.getElementById('hud-name').textContent='Player '+slot;
+  history.replaceState(null,'',location.pathname+'?code='+code);
+  if(!gameStarted){ resetLobby(); showScreen('lobby'); }
 });
 
 socket.on('lobby_update',data=>{
-  updateReadyDots({A:data.A,B:data.B},{A:data.readyA,B:data.readyB});
-  if(data.A&&data.B){
-    document.getElementById('lobby-status').textContent='Both captains aboard — ready up!';
-  }
+  setPP('A',data.A,data.readyA);
+  setPP('B',data.B,data.readyB);
+  const st=document.getElementById('lobby-status');
+  if(data.A&&data.B) st.textContent=(data.readyA&&data.readyB)?'Casting off…':'Both captains aboard — tap Ready';
+  else st.textContent='Waiting for the other captain…';
 });
-
-function updateReadyDots(present,ready){
-  document.getElementById('dot-a').className='ri-dot'+(present.A?' on':'');
-  document.getElementById('dot-b').className='ri-dot'+(present.B?' on':'');
-  if(ready.A) document.getElementById('dot-a').style.background='#3ddc84';
-  if(ready.B) document.getElementById('dot-b').style.background='#3ddc84';
+function setPP(s,on,ready){
+  const el=document.getElementById('pp-'+s);
+  el.classList.toggle('on',!!on);
+  el.classList.toggle('ready',!!ready);
 }
 
 socket.on('game_start',()=>{
   isReady=false;
   gameStarted=true;
+  hideMenu();
+  resetTorpedo();
   showScreen('battle');
+  buzz([20,40,20]);
 });
 
-socket.on('host_disconnected',()=>{ alert('Host disconnected. Please refresh the page.'); });
+socket.on('back_to_lobby',()=>{
+  gameStarted=false;
+  releaseAll();
+  hideMenu();
+  resetLobby();
+  showScreen('lobby');
+});
+
+socket.on('host_ui',ui=>{ if(ui&&ui.menu) showMenu(ui); else hideMenu(); });
+
+socket.on('replaced',()=>{
+  retired=true; releaseAll();
+  showInfo('Moved','Opened on another tab','This controller was reopened somewhere else on this phone. Use that tab instead.');
+  socket.disconnect();
+});
+socket.on('host_disconnected',()=>{
+  retired=true; releaseAll();
+  showInfo('Disconnected','Host left','The big screen closed the game. Scan the new QR code to play again.');
+});
+function showInfo(eb,t,s){
+  document.getElementById('info-eyebrow').textContent=eb;
+  document.getElementById('info-title').textContent=t;
+  document.getElementById('info-sub').textContent=s;
+  hideMenu(); hideConnBanner(); showScreen('info');
+}
 
 // ── RECONNECTION ──
 const connBanner=document.getElementById('conn-banner');
-function showConnBanner(msg){ connBanner.textContent=msg; connBanner.style.display='block'; }
-function hideConnBanner(){ connBanner.style.display='none'; }
-socket.on('disconnect',()=>{ if(mySlot&&myCode) showConnBanner('Connection lost — reconnecting...'); });
-socket.io.on('reconnect',()=>{ if(mySlot&&myCode) socket.emit('rejoin_game',{code:myCode,slot:mySlot}); });
-socket.on('connect',()=>{ if(mySlot&&myCode) socket.emit('rejoin_game',{code:myCode,slot:mySlot}); });
+const netDot=document.getElementById('net-dot');
+function showConnBanner(msg){ connBanner.textContent=msg; connBanner.style.display='block'; netDot.classList.add('off'); }
+function hideConnBanner(){ connBanner.style.display='none'; netDot.classList.remove('off'); }
+socket.on('disconnect',()=>{ if(mySlot&&myCode&&!retired) showConnBanner('Connection lost — reconnecting'); });
+socket.on('connect',()=>{ if(mySlot&&myCode&&!retired) socket.emit('rejoin_game',{code:myCode,slot:mySlot,clientId}); });
 
-setInterval(()=>{
-  const start=performance.now();
-  socket.emit('ping_check',()=>{ /* latency probe */ });
-},5000);
+setInterval(()=>{ socket.emit('ping_check',()=>{}); },5000);
+
+// ═══════════════════════════════════════════════════════
+//  MIRRORED END MENU — tap an item
+// ═══════════════════════════════════════════════════════
+const menuOv=document.getElementById('menu-ov');
+const mlist=document.getElementById('mlist');
+function showMenu(ui){
+  releaseAll();
+  document.getElementById('menu-eyebrow').textContent=ui.eyebrow||'Battle over';
+  const t=document.getElementById('menu-title');
+  t.textContent=ui.title||'';
+  t.style.color=ui.winner==='B'?'var(--navy)':'var(--ink)';
+  mlist.classList.toggle('locked',!!ui.locked);
+  mlist.innerHTML='';
+  (ui.items||[]).forEach((label,i)=>{
+    const d=document.createElement('div');
+    d.className='mi'+(i===ui.focus?' focus':'');
+    d.textContent=label;
+    d.addEventListener('pointerdown',e=>{
+      e.preventDefault();
+      if(mlist.classList.contains('locked')) return;
+      buzz(12);
+      socket.emit('ctrl_menu',{index:i});
+    });
+    mlist.appendChild(d);
+  });
+  menuOv.classList.remove('hidden');
+}
+function hideMenu(){ menuOv.classList.add('hidden'); }
 
 // ═══════════════════════════════════════════════════════
 //  SHIP'S WHEEL — drag around the dial to rotate it; holding
 //  it (anywhere on the dial) makes the ship sail forward.
+//  (behaviour unchanged from the original)
 // ═══════════════════════════════════════════════════════
 const MAX_WHEEL_DEG=150;   // physical stop, matches host's turn clamp with a little overtravel
 const wheelWrap=document.getElementById('wheel-wrap');
@@ -259,7 +452,7 @@ wheelWrap.addEventListener('pointerdown',e=>{
   wheelGraphic.classList.add('active');
   dragStartTouchAngle=angleFromCenter(e.clientX,e.clientY);
   dragStartWheelAngle=wheelAngle;
-  document.getElementById('battle-status').textContent='Sailing...';
+  document.getElementById('battle-status').textContent='Sailing…';
 });
 
 wheelWrap.addEventListener('pointermove',e=>{
@@ -285,38 +478,46 @@ wheelWrap.addEventListener('pointerleave',e=>{ /* pointer capture keeps drag ali
 
 // send wheel state to host at a steady rate
 setInterval(()=>{
-  if(!myCode||!mySlot) return;
+  if(!myCode||!mySlot||retired) return;
   socket.emit('ctrl_wheel',{code:myCode,slot:mySlot,angle:wheelAngle,thrust:isTouching});
 },40);
 
 // release input if the tab is hidden mid-battle
 document.addEventListener('visibilitychange',()=>{
-  if(document.hidden){ isTouching=false; wheelGraphic.classList.remove('active'); }
+  if(document.hidden){ releaseAll(); }
 });
 
 // ═══════════════════════════════════════════════════════
 //  MACHINE GUN — forward only, fires while held
 // ═══════════════════════════════════════════════════════
 const gunBtn=document.getElementById('gun-btn');
-let gunInterval=null;
+let gunInterval=null, gunPointer=null;
 function startGun(){
   if(gunInterval) return;
   fireGunOnce();
   gunInterval=setInterval(fireGunOnce,150);
-  gunBtn.classList.add('firing');
+  gunBtn.classList.add('firing','down');
 }
 function fireGunOnce(){
   if(!myCode||!mySlot) return;
   socket.emit('ctrl_gun',{code:myCode,slot:mySlot});
+  buzz(8);
 }
-function stopGun(){
+function stopGun(e){
+  if(e&&gunPointer!==null&&e.pointerId!==gunPointer) return;
+  gunPointer=null;
   if(gunInterval){ clearInterval(gunInterval); gunInterval=null; }
-  gunBtn.classList.remove('firing');
+  gunBtn.classList.remove('firing','down');
 }
-gunBtn.addEventListener('pointerdown',e=>{ e.preventDefault(); startGun(); });
+gunBtn.addEventListener('pointerdown',e=>{
+  e.preventDefault();
+  if(gunPointer!==null) return;
+  gunPointer=e.pointerId;
+  try{ gunBtn.setPointerCapture(e.pointerId); }catch(_){}
+  startGun();
+});
 gunBtn.addEventListener('pointerup',stopGun);
 gunBtn.addEventListener('pointercancel',stopGun);
-gunBtn.addEventListener('pointerleave',stopGun);
 
 // ═══════════════════════════════════════════════════════
 //  TORPEDOES — 3-shot broadside salvo off the port (left) side,
@@ -324,15 +525,51 @@ gunBtn.addEventListener('pointerleave',stopGun);
 // ═══════════════════════════════════════════════════════
 const TORPEDO_COOLDOWN_MS=3600;
 const torpBtn=document.getElementById('torp-btn');
-let torpReady=true;
+const torpSweep=document.getElementById('torp-sweep');
+const torpSt=document.getElementById('torp-st');
+let torpReady=true, torpFiredAt=0, torpRaf=null;
+
 torpBtn.addEventListener('pointerdown',e=>{
   e.preventDefault();
+  torpBtn.classList.add('down');
   if(!torpReady||!myCode||!mySlot) return;
   socket.emit('ctrl_torpedo',{code:myCode,slot:mySlot});
+  buzz([30,30,30]);
   torpReady=false;
+  torpFiredAt=performance.now();
   torpBtn.classList.add('cooldown');
-  setTimeout(()=>{ torpReady=true; torpBtn.classList.remove('cooldown'); },TORPEDO_COOLDOWN_MS);
+  torpSt.textContent='Reload';torpSt.classList.add('wait');
+  cancelAnimationFrame(torpRaf);
+  torpRaf=requestAnimationFrame(tickTorpedo);
 });
+const torpUp=()=>torpBtn.classList.remove('down');
+torpBtn.addEventListener('pointerup',torpUp);
+torpBtn.addEventListener('pointercancel',torpUp);
+torpBtn.addEventListener('pointerleave',torpUp);
+
+function tickTorpedo(){
+  const k=Math.min(1,(performance.now()-torpFiredAt)/TORPEDO_COOLDOWN_MS);
+  torpSweep.style.setProperty('--p',k.toFixed(3));
+  if(k<1){ torpRaf=requestAnimationFrame(tickTorpedo); return; }
+  torpReady=true;
+  torpBtn.classList.remove('cooldown');
+  torpSt.textContent='Ready';torpSt.classList.remove('wait');
+  torpBtn.classList.remove('pinged');void torpBtn.offsetWidth;torpBtn.classList.add('pinged');
+  buzz(15);
+}
+function resetTorpedo(){
+  cancelAnimationFrame(torpRaf);
+  torpReady=true;
+  torpSweep.style.setProperty('--p','1');
+  torpBtn.classList.remove('cooldown','down');
+  torpSt.textContent='Ready';torpSt.classList.remove('wait');
+}
+
+function releaseAll(){
+  isTouching=false; activePointerId=null; wheelGraphic.classList.remove('active');
+  document.getElementById('battle-status').textContent='Hold the wheel to sail';
+  stopGun(); torpUp();
+}
 
 applyWheelVisual();
 </script>
