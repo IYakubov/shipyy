@@ -21,7 +21,6 @@ app.use(express.static(path.join(__dirname, 'public')));
 //   players:   { A: socketId|null, B: socketId|null },
 //   clientIds: { A: string|null,   B: string|null },   // one phone = one slot
 //   ready:     { A: false, B: false },
-//   mode:      'duo' | 'solo'   (solo = one phone vs the host's bot)
 //   started:   false
 // }
 const rooms = {};
@@ -61,7 +60,7 @@ function buildJoinUrl(origin, base, code) {
 }
 
 function lobbyPayload(room) {
-  return { mode: room.mode, A: !!room.players.A, B: !!room.players.B, readyA: room.ready.A, readyB: room.ready.B };
+  return { A: !!room.players.A, B: !!room.players.B, readyA: room.ready.A, readyB: room.ready.B };
 }
 
 function broadcastLobby(code) {
@@ -95,7 +94,7 @@ function claimSlot(socket, code, clientId) {
 
   // already seated here
   if (socket.data.code === code && socket.data.slot && room.players[socket.data.slot] === socket.id) {
-    socket.emit('joined', { slot: socket.data.slot, code, mode: room.mode });
+    socket.emit('joined', { slot: socket.data.slot, code });
     if (room.started) socket.emit('game_start');
     return;
   }
@@ -120,8 +119,8 @@ function claimSlot(socket, code, clientId) {
   } else {
     if (room.started) { socket.emit('join_error', 'Game already started'); return; }
     if (!room.players.A) slot = 'A';
-    else if (room.mode !== 'solo' && !room.players.B) slot = 'B';
-    else { socket.emit('join_error', room.mode === 'solo' ? 'This is a 1-player game' : 'Room is full'); return; }
+    else if (!room.players.B) slot = 'B';
+    else { socket.emit('join_error', 'Room is full'); return; }
     room.ready[slot] = false;
   }
 
@@ -133,7 +132,7 @@ function claimSlot(socket, code, clientId) {
 
   console.log(`[${code}] slot ${slot} ← ${socket.handshake.headers['user-agent'] || 'unknown device'}`);
 
-  socket.emit('joined', { slot, code, mode: room.mode });
+  socket.emit('joined', { slot, code });
   if (room.hostSocketId) io.to(room.hostSocketId).emit('player_joined', { slot, players: lobbyPayload(room) });
   broadcastLobby(code);
   if (room.started) socket.emit('game_start');
@@ -153,7 +152,6 @@ io.on('connection', (socket) => {
       players: { A: null, B: null },
       clientIds: { A: null, B: null },
       ready: { A: false, B: false },
-      mode: opts && opts.mode === 'solo' ? 'solo' : 'duo',
       started: false,
       lastUi: null
     };
@@ -168,7 +166,7 @@ io.on('connection', (socket) => {
         color: { dark: '#1b1b1a', light: '#00000000' }
       });
     } catch (e) { console.error('QR failed', e); }
-    socket.emit('game_created', { code, joinUrl, qrSvg, mode: rooms[code].mode });
+    socket.emit('game_created', { code, joinUrl, qrSvg });
   });
 
   // ── CONTROLLER: join / rejoin ──
@@ -182,10 +180,7 @@ io.on('connection', (socket) => {
     const { room, code, slot } = pr;
     room.ready[slot] = true;
     broadcastLobby(code);
-    const allReady = room.mode === 'solo'
-      ? (room.ready.A && room.players.A)
-      : (room.ready.A && room.ready.B && room.players.A && room.players.B);
-    if (allReady && !room.started) {
+    if (room.ready.A && room.ready.B && room.players.A && room.players.B && !room.started) {
       room.started = true;
       io.to(code).emit('game_start');
       if (room.hostSocketId) io.to(room.hostSocketId).emit('game_start');

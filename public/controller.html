@@ -144,7 +144,7 @@ html,body{
   <div class="sub" id="lobby-status">Waiting for the other captain…</div>
   <div class="pair">
     <div class="pp" id="pp-A"><i></i>Player A</div>
-    <div class="pp B" id="pp-B"><i></i><span id="pp-B-name">Player B</span></div>
+    <div class="pp B" id="pp-B"><i></i>Player B</div>
   </div>
   <button class="btn" id="ready-btn">Ready</button>
 </div>
@@ -312,13 +312,9 @@ function resetLobby(){
   readyBtn.classList.remove('done');
 }
 
-let gameMode='duo';
-socket.on('joined',({slot,code,mode})=>{
+socket.on('joined',({slot,code})=>{
   hideConnBanner();
   mySlot=slot;myCode=code;
-  gameMode=mode==='solo'?'solo':'duo';
-  document.getElementById('pp-B-name').textContent=gameMode==='solo'?'Bot':'Player B';
-  if(gameMode==='solo'){ setPP('B',true,false); document.getElementById('lobby-status').textContent='You vs the bot — tap Ready to set sail'; }
   document.body.classList.toggle('B',slot==='B');
   document.getElementById('my-slot-tile').textContent=slot;
   document.getElementById('my-slot-badge').textContent='Player '+slot;
@@ -329,15 +325,9 @@ socket.on('joined',({slot,code,mode})=>{
 });
 
 socket.on('lobby_update',data=>{
-  if(data.mode) gameMode=data.mode;
-  const st=document.getElementById('lobby-status');
   setPP('A',data.A,data.readyA);
-  if(gameMode==='solo'){
-    setPP('B',true,false);
-    st.textContent=data.readyA?'Casting off…':'You vs the bot — tap Ready to set sail';
-    return;
-  }
   setPP('B',data.B,data.readyB);
+  const st=document.getElementById('lobby-status');
   if(data.A&&data.B) st.textContent=(data.readyA&&data.readyB)?'Casting off…':'Both captains aboard — tap Ready';
   else st.textContent='Waiting for the other captain…';
 });
