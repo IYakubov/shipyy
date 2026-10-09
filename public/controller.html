@@ -219,7 +219,7 @@ html,body{
 
 <div id="rotate"><div class="phone"></div><div class="sub">Turn your phone sideways to take the helm</div></div>
 
-<script src="/socket.io/socket.io.js"></script>
+<script>window.__SC_BASE=location.pathname.replace(/[^/]*$/,'');</script><script src="socket.io/socket.io.js"></script>
 <script>
 'use strict';
 
@@ -239,7 +239,7 @@ function buzz(ms){ try{ if(navigator.vibrate) navigator.vibrate(ms); }catch(e){}
 // ═══════════════════════════════════════════════════════
 //  SOCKET + ONE PHONE = ONE SLOT
 // ═══════════════════════════════════════════════════════
-const socket=io({ transports:['websocket'] });
+const socket=io({path:window.__SC_BASE+'socket.io',transports:['websocket']});
 let mySlot=null, myCode=null, gameStarted=false, retired=false;
 
 function getClientId(){

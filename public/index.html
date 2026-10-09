@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Naval Duel</title>
 <link rel="stylesheet" href="fonts/fonts.css">
-<script src="/socket.io/socket.io.js"></script>
+<script>window.__SC_BASE=location.pathname.replace(/[^/]*$/,'');</script><script src="socket.io/socket.io.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -768,7 +768,7 @@ document.addEventListener('keydown',e=>{
 // ═══════════════════════════════════════════════════════
 //  SOCKET.IO
 // ═══════════════════════════════════════════════════════
-const socket=io();
+const socket=io({path:window.__SC_BASE+'socket.io'});
 let myCode=null;
 
 document.getElementById('btn-create').addEventListener('click',()=>{
