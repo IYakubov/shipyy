@@ -66,7 +66,14 @@ canvas{display:block;position:absolute;inset:0;width:100%;height:100%}
 .lede{font-size:.78rem;font-weight:400;line-height:1.75;color:var(--dim);text-align:center;max-width:460px}
 .btn{font-family:inherit;font-size:.82rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:18px 40px;border-radius:14px;border:none;background:var(--ink);color:var(--paper);cursor:pointer;transition:transform .1s}
 .btn:active{transform:translateY(2px)}
-.home-ship{width:min(320px,60vw);opacity:.9}
+.modes{display:flex;gap:14px}
+.mode{font-family:inherit;width:200px;padding:22px 22px 20px;border-radius:18px;border:1px solid var(--line);background:var(--paper);color:var(--ink);cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;gap:6px;text-align:left;transition:background .12s,color .12s,transform .1s}
+.mode:hover,.mode:focus-visible{background:var(--ink);color:var(--paper);outline:none}
+.mode:active{transform:translateY(2px)}
+.mode-n{font-size:2.6rem;font-weight:850;line-height:1}
+.mode-l{font-size:.74rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
+.mode-s{font-size:.54rem;font-weight:500;letter-spacing:.12em;text-transform:uppercase;opacity:.6}
+.key-hint{font-size:.52rem;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
 
 /* lobby */
 #room-chip{position:absolute;top:20px;right:24px;font-size:.6rem;font-weight:600;letter-spacing:.16em;color:var(--dim);text-transform:uppercase}
@@ -109,7 +116,7 @@ canvas{display:block;position:absolute;inset:0;width:100%;height:100%}
 <!-- TOPBAR (battle only) -->
 <div id="topbar" class="hidden">
   <div class="side left">
-    <div class="tag cA"><span class="sw A"></span>Player A</div>
+    <div class="tag cA"><span class="sw A"></span><span id="nameA">Player A</span></div>
     <div class="meters">
       <div class="hp" id="hpA"></div>
       <div class="reload"><div class="rbar"><i id="rbA"></i></div><span class="rlabel" id="rlA">READY</span></div>
@@ -120,7 +127,7 @@ canvas{display:block;position:absolute;inset:0;width:100%;height:100%}
     <div class="status" id="status-line">Sink the enemy ship</div>
   </div>
   <div class="side right">
-    <div class="tag cB"><span class="sw B"></span>Player B</div>
+    <div class="tag cB"><span class="sw B"></span><span id="nameB">Player B</span></div>
     <div class="meters">
       <div class="hp" id="hpB"></div>
       <div class="reload"><div class="rbar"><i id="rbB"></i></div><span class="rlabel" id="rlB">READY</span></div>
@@ -135,10 +142,14 @@ canvas{display:block;position:absolute;inset:0;width:100%;height:100%}
 
   <!-- HOME -->
   <div class="screen" id="screen-home">
-    <div class="eyebrow">2 players · phones are the helm</div>
+    <div class="eyebrow">Your phone is the helm</div>
     <div class="big-title">Naval<br>Duel</div>
     <div class="lede">Steer with the ship's wheel, rake the enemy with the bow gun, and finish them with a torpedo broadside.</div>
-    <button class="btn" id="btn-create">Create game</button>
+    <div class="modes">
+      <button class="mode" data-mode="solo"><span class="mode-n">1</span><span class="mode-l">Player</span><span class="mode-s">vs the bot</span></button>
+      <button class="mode" data-mode="duo"><span class="mode-n">2</span><span class="mode-l">Players</span><span class="mode-s">phone vs phone</span></button>
+    </div>
+    <div class="key-hint">Press 1 or 2</div>
   </div>
 
   <!-- LOBBY -->
@@ -150,7 +161,7 @@ canvas{display:block;position:absolute;inset:0;width:100%;height:100%}
     </div>
     <div class="slots">
       <div class="slot" id="slot-A"><span class="sw A"></span><div><div class="slot-name">Player A</div><div class="slot-st" id="st-A">Waiting</div></div></div>
-      <div class="slot" id="slot-B"><span class="sw B"></span><div><div class="slot-name cB">Player B</div><div class="slot-st" id="st-B">Waiting</div></div></div>
+      <div class="slot" id="slot-B"><span class="sw B"></span><div><div class="slot-name cB" id="slotname-B">Player B</div><div class="slot-st" id="st-B">Waiting</div></div></div>
     </div>
     <div class="esc-hint">Esc — back</div>
   </div>
@@ -242,7 +253,10 @@ const C={soil:'#cfcdc6',slab:'#dddbd4',paper:'#ecebe6',ink:'#1b1b1a',navy:'#1A43
 // ═══════════════════════════════════════════════════════
 let shipA=null, shipB=null;
 let bullets=[], torpedoes=[], particles=[], rings=[], swell=[];
-let gameActive=false, countdownT=0, seaT=0;
+let gameActive=false, countdownT=0, seaT=0, paused=false;
+let mode='duo';              // 'solo' = phone vs bot, 'duo' = phone vs phone
+let botLevel=1;              // solo: rises by one after every win
+let presence={A:false,B:false};
 let lastTs=0;
 const netInput={
   A:{angle:0,thrust:false,gunHeld:false},
@@ -407,9 +421,10 @@ function updateGame(dt){
     r.r=4+(r.max-4)*(1-Math.pow(r.life/r.maxLife,2));
   }
 
-  if(!gameActive) return;
+  if(!gameActive||paused) return;
   if(countdownT>0){ countdownT=Math.max(0,countdownT-dt); return; }
 
+  if(mode==='solo') updateBot(dt);
   updateShip(shipA,dt);
   updateShip(shipB,dt);
 
@@ -444,6 +459,121 @@ function updateGame(dt){
       spawnRing(t.x,t.y,70,C.paper,600);
       sfxExplosion();
       shipTakeDamage(target,TORPEDO_DAMAGE);
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  BOT (1-player mode) — drives ship B through the same
+//  netInput a phone would: wheel angle, thrust, gun held, and
+//  calls fireTorpedoes() itself. Same speed, turn rate, weapons
+//  and cooldowns as the player; it only gets better at using them.
+// ═══════════════════════════════════════════════════════
+const bot={think:0,state:'hunt',jitter:0,seen:null,seenAge:0,burstT:0,burstOn:true,dodge:null,orbit:1,stuckT:0};
+
+function botParams(L){
+  const k=Math.min(1,(L-1)/4);             // level 1 → 0, level 5+ → 1
+  return{
+    react:   300-180*k,    // ms between looks at the player
+    jitter:  0.13-0.10*k,  // rad of aim noise per look
+    lead:    0.35+0.65*k,  // how well it predicts where you'll be
+    gunRange:380+220*k,    // px it starts shooting from
+    burst:   0.45+0.5*k,   // share of time the trigger is held when aligned
+    torp:    0.25+0.7*k,   // chance to set up a broadside when torpedoes are ready
+    dodge:   0.1+0.75*k    // chance to swerve from an incoming torpedo
+  };
+}
+function resetBot(){
+  bot.think=600; bot.state='hunt'; bot.jitter=0; bot.seen=null; bot.seenAge=0;
+  bot.burstT=0; bot.burstOn=true; bot.dodge=null; bot.orbit=Math.random()<.5?-1:1; bot.stuckT=0;
+}
+function wrapAng(a){ while(a>Math.PI) a-=Math.PI*2; while(a<-Math.PI) a+=Math.PI*2; return a; }
+
+function updateBot(dt){
+  const me=shipB, foe=shipA, inp=netInput.B;
+  if(!me||!foe||!me.alive){ inp.thrust=false; inp.gunHeld=false; return; }
+  const P=botParams(botLevel);
+  const dx0=foe.x-me.x, dy0=foe.y-me.y, dist=Math.hypot(dx0,dy0);
+
+  // ── look at the battlefield every `react` ms (reaction delay) ──
+  bot.think-=dt; bot.seenAge+=dt;
+  if(bot.think<=0||!bot.seen){
+    bot.think=P.react*(0.8+Math.random()*0.4);
+    bot.jitter=(Math.random()*2-1)*P.jitter;
+    bot.seen={x:foe.x,y:foe.y,vx:Math.cos(foe.angle)*foe.speed,vy:Math.sin(foe.angle)*foe.speed};
+    bot.seenAge=0;
+
+    const torpReady=me.torpCooldown<=0;
+    if(dist<150) bot.state='evade';
+    else if(bot.state==='evade'&&dist>260) bot.state='hunt';
+    else if(bot.state==='hunt'&&torpReady&&dist>150&&dist<520&&Math.random()<P.torp) bot.state='broadside';
+    else if(bot.state==='broadside'&&(!torpReady||dist>640)) bot.state='hunt';
+
+    // incoming torpedo? decide once per look whether to swerve
+    bot.dodge=null;
+    for(const t of torpedoes){
+      if(t.owner!=='A') continue;
+      const rx=me.x-t.x, ry=me.y-t.y;
+      const tv=Math.hypot(t.vx,t.vy)||1;
+      const tc=(rx*t.vx+ry*t.vy)/(tv*tv);              // time to closest approach
+      if(tc<0||tc>1.8) continue;
+      const cx=t.x+t.vx*tc-me.x, cy=t.y+t.vy*tc-me.y;
+      if(Math.hypot(cx,cy)<SHIP_R*1.4&&Math.random()<P.dodge){
+        // steer perpendicular to the torpedo, to whichever side moves us away from its line
+        const side=(t.vx*ry-t.vy*rx)>=0?1:-1;
+        bot.dodge=Math.atan2(t.vy,t.vx)+side*Math.PI/2;
+        break;
+      }
+    }
+    if(Math.random()<0.08) bot.orbit*=-1;
+  }
+
+  // where the bot believes the player is right now (from its last look)
+  const s=bot.seen, age=bot.seenAge/1000;
+  const fx=s.x+s.vx*age, fy=s.y+s.vy*age;
+  const fd=Math.hypot(fx-me.x,fy-me.y);
+
+  // gun aim point (leads the target by bullet flight time)
+  const tg=fd/GUN_SPEED*P.lead;
+  const gx=fx+s.vx*tg, gy=fy+s.vy*tg;
+  const gunBearing=Math.atan2(gy-me.y,gx-me.x)+bot.jitter;
+
+  // torpedo aim point (slower, so leads further)
+  const tt=fd/TORPEDO_SPEED*P.lead;
+  const tx=fx+s.vx*tt, ty=fy+s.vy*tt;
+  const torpBearing=Math.atan2(ty-me.y,tx-me.x)+bot.jitter*0.6;
+
+  let desired;
+  if(bot.state==='broadside') desired=torpBearing+Math.PI/2;      // put the target on the port side
+  else if(bot.state==='evade') desired=Math.atan2(me.y-fy,me.x-fx)+bot.orbit*0.9;
+  else desired=gunBearing;
+
+  if(bot.dodge!==null) desired=bot.dodge;
+
+  // keep off the walls: look ahead along the heading
+  const look=SHIP_LEN*1.6, m=SHIP_R+40;
+  const lx=me.x+Math.cos(me.angle)*look, ly=me.y+Math.sin(me.angle)*look;
+  if(lx<m||lx>AW-m||ly<m||ly>AH-m){
+    desired=Math.atan2(AH/2-me.y,AW/2-me.x);
+  }
+
+  const err=wrapAng(desired-me.angle);
+  inp.angle=Math.max(-MAX_WHEEL_DEG,Math.min(MAX_WHEEL_DEG,err/0.45*MAX_WHEEL_DEG));
+  inp.thrust=true;
+
+  // gun: bursts while the bow points at the aim point
+  bot.burstT-=dt;
+  if(bot.burstT<=0){ bot.burstT=350+Math.random()*350; bot.burstOn=Math.random()<P.burst; }
+  const gunErr=Math.abs(wrapAng(gunBearing-me.angle));
+  const tol=Math.max(0.05,Math.atan2(SHIP_R*0.6,Math.max(1,fd)));
+  inp.gunHeld=bot.burstOn&&fd<P.gunRange&&gunErr<tol+0.04;
+
+  // torpedoes: fire when the target sits off the port beam
+  if(me.torpCooldown<=0&&fd<560&&fd>110){
+    const portErr=Math.abs(wrapAng(torpBearing-(me.angle-Math.PI/2)));
+    if(portErr<0.16&&(bot.state==='broadside'||portErr<0.08)){
+      fireTorpedoes(me);
+      bot.state='hunt';
     }
   }
 }
@@ -652,10 +782,10 @@ function loop(ts){
   updateGame(dt);
   render();
   drawHUD();
-  if(gameActive&&countdownT>0){
+  if(gameActive&&!paused&&countdownT>0){
     const n=Math.ceil(countdownT/1000);
     if(n!==lastCd){ lastCd=n; popCountdown(String(n)); }
-  }else if(gameActive&&lastCd>0){ lastCd=0; popCountdown('Go'); setStatus('Sink the enemy ship'); }
+  }else if(gameActive&&!paused&&lastCd>0){ lastCd=0; popCountdown('Go'); setStatus(mode==='solo'?'Level '+botLevel+(bestLevel()?' · best '+bestLevel():''):'Sink the enemy ship'); }
   requestAnimationFrame(loop);
 }
 function popCountdown(txt){
@@ -690,14 +820,20 @@ function toast(msg,ms){
 //  also takes arrows / Enter / mouse. 0.9 s input lock.
 // ═══════════════════════════════════════════════════════
 let menu=null; // {items:[{id,label}], focus, lockUntil, title, eyebrow}
+let lastWinner=null;
 
 function openEndMenu(winner){
   const loser=winner==='A'?'B':'A';
+  let eyebrow='Player '+loser+' sunk', title='Player '+winner+' wins', again='Rematch';
+  if(mode==='solo'){
+    if(winner==='A'){ eyebrow='Bot sunk · level '+botLevel+' cleared'; title='You win'; again='Next battle · level '+(botLevel+1); }
+    else { eyebrow='Your ship was sunk · level '+botLevel; title='The bot wins'; again='Try again'; }
+  }
   menu={
-    eyebrow:'Player '+loser+' sunk',
-    title:'Player '+winner+' wins',
+    eyebrow,
+    title,
     winner,
-    items:[{id:'rematch',label:'Rematch'},{id:'lobby',label:'Back to lobby'}],
+    items:[{id:'rematch',label:again},{id:'lobby',label:'Back to lobby'}],
     focus:0,
     lockUntil:performance.now()+MENU_LOCK_MS
   };
@@ -743,15 +879,20 @@ function chooseMenu(i){
     if(!menu) return;
     menu=null;pushUi();
     if(id==='rematch'){ socket.emit('restart_game',{code:myCode}); }
-    else { socket.emit('host_back_to_lobby',{code:myCode}); gameActive=false; shipA=shipB=null; setSlot('A','waiting');setSlot('B','waiting'); showScreen('screen-lobby'); }
+    else { socket.emit('host_back_to_lobby',{code:myCode}); gameActive=false; paused=false; shipA=shipB=null; botLevel=1; lastWinner=null; applyModeLabels(); setSlot('A','waiting');setSlot('B',mode==='solo'?'bot':'waiting'); showScreen('screen-lobby'); }
   },160);
 }
 
 function endMatch(winnerSide){
   if(!gameActive) return;
   gameActive=false;
-  setStatus('Player '+winnerSide+' wins');
+  netInput.B.gunHeld=false; netInput.B.thrust=false;
+  if(mode==='solo'){
+    setStatus(winnerSide==='A'?'You win':'The bot wins');
+    if(winnerSide==='A'){ saveBest(botLevel); }
+  } else setStatus('Player '+winnerSide+' wins');
   sfxWin();
+  lastWinner=winnerSide;
   showScreen('screen-gameover');
   openEndMenu(winnerSide);
 }
@@ -759,6 +900,8 @@ function endMatch(winnerSide){
 document.addEventListener('keydown',e=>{
   const lobby=!document.getElementById('screen-lobby').classList.contains('hidden');
   if(lobby&&e.key==='Escape'){ showScreen('screen-home'); return; }
+  const home=!document.getElementById('screen-home').classList.contains('hidden');
+  if(home&&(e.key==='1'||e.key==='2')){ createGame(e.key==='1'?'solo':'duo'); return; }
   if(!menu) return;
   if(e.key==='ArrowUp'||e.key==='ArrowLeft'){ e.preventDefault(); moveMenu(-1); }
   else if(e.key==='ArrowDown'||e.key==='ArrowRight'){ e.preventDefault(); moveMenu(1); }
@@ -771,15 +914,28 @@ document.addEventListener('keydown',e=>{
 const socket=io();
 let myCode=null;
 
-document.getElementById('btn-create').addEventListener('click',()=>{
-  socket.emit('create_game',{origin:location.origin,base:location.pathname.replace(/[^/]*$/,'')});
-});
+function createGame(m){
+  mode=m;
+  socket.emit('create_game',{mode:m,origin:location.origin,base:location.pathname.replace(/[^/]*$/,'')});
+}
+document.querySelectorAll('.mode').forEach(b=>b.addEventListener('click',()=>createGame(b.dataset.mode)));
 
-socket.on('game_created',({code,qrSvg})=>{
-  myCode=code;
+function bestLevel(){ try{ return +localStorage.getItem('navalduel_best')||0; }catch(e){ return 0; } }
+function saveBest(l){ try{ if(l>bestLevel()) localStorage.setItem('navalduel_best',String(l)); }catch(e){} }
+
+function applyModeLabels(){
+  const solo=mode==='solo';
+  document.getElementById('nameA').textContent=solo?'You':'Player A';
+  document.getElementById('nameB').textContent=solo?'Bot · Lv '+botLevel:'Player B';
+  document.getElementById('slotname-B').textContent=solo?'Bot':'Player B';
+}
+
+socket.on('game_created',({code,qrSvg,mode:m})=>{
+  myCode=code; mode=m||mode; botLevel=1; presence={A:false,B:false};
+  applyModeLabels();
   document.getElementById('room-code-display').textContent=code;
   document.getElementById('join-qr').innerHTML=qrSvg||'';
-  setSlot('A','waiting');setSlot('B','waiting');
+  setSlot('A','waiting');setSlot('B',mode==='solo'?'bot':'waiting');
   showScreen('screen-lobby');
 });
 
@@ -787,32 +943,57 @@ function setSlot(s,state){
   const el=document.getElementById('slot-'+s);
   el.classList.toggle('on',state==='connected');
   el.classList.toggle('ready',state==='ready');
-  document.getElementById('st-'+s).textContent=state==='ready'?'Ready':state==='connected'?'Connected':'Waiting';
+  document.getElementById('st-'+s).textContent=state==='bot'?'Standing by':state==='ready'?'Ready':state==='connected'?'Connected':'Waiting';
+  if(state==='bot') el.classList.add('on');
 }
 
 socket.on('lobby_update',data=>{
+  if(data.mode) mode=data.mode;
+  presence={A:!!data.A,B:!!data.B};
   setSlot('A',data.readyA?'ready':data.A?'connected':'waiting');
-  setSlot('B',data.readyB?'ready':data.B?'connected':'waiting');
+  setSlot('B',mode==='solo'?'bot':data.readyB?'ready':data.B?'connected':'waiting');
+  checkPause();
 });
 
+// a battle freezes while a needed phone is missing, and resumes when it returns
+function checkPause(){
+  const need=mode==='solo'?['A']:['A','B'];
+  const missing=need.filter(s=>!presence[s]);
+  const was=paused;
+  paused=gameActive&&missing.length>0;
+  if(paused){
+    for(const s of missing){ netInput[s].thrust=false; netInput[s].gunHeld=false; }
+    setStatus('Paused — waiting for '+(mode==='solo'?'your phone':'Player '+missing.join(' & ')));
+  } else if(was&&gameActive){ setStatus(countdownT>0?'Get ready':mode==='solo'?'Level '+botLevel:'Sink the enemy ship'); toast('Back in action'); }
+}
+
 socket.on('player_left',({slot})=>{
-  setSlot(slot,'waiting');
-  if(gameActive){ netInput[slot].thrust=false; netInput[slot].gunHeld=false; toast('Player '+slot+' lost connection',3200); }
+  if(!(mode==='solo'&&slot==='B')) setSlot(slot,'waiting');
+  presence[slot]=false;
+  if(gameActive){ toast((mode==='solo'?'Your phone':'Player '+slot)+' lost connection',3200); }
+  checkPause();
 });
-socket.on('player_joined',({slot})=>{ if(gameActive) toast('Player '+slot+' is back'); });
+socket.on('player_joined',({slot})=>{ presence[slot]=true; checkPause(); });
 
 socket.on('game_start',()=>{
   menu=null;pushUi();
   hideScreens();
-  resize();initSea();resetShips();buildHP();
-  gameActive=true;countdownT=COUNTDOWN_MS;lastCd=-1;
+  // a solo rematch after a win moves up a level
+  if(mode==='solo'&&lastWinner==='A') botLevel++;
+  lastWinner=null;
+  applyModeLabels();
+  resize();initSea();resetShips();buildHP();resetBot();
+  gameActive=true;countdownT=COUNTDOWN_MS;lastCd=-1;paused=false;
+  presence.A=true; if(mode==='duo') presence.B=true;
   setStatus('Get ready');
 });
 
 socket.on('ctrl_wheel',({slot,angle,thrust})=>{
+  if(mode==='solo'&&slot!=='A') return;
   if(netInput[slot]){ netInput[slot].angle=angle; netInput[slot].thrust=thrust; }
 });
 socket.on('ctrl_gun',({slot})=>{
+  if(mode==='solo'&&slot!=='A') return;
   // held-state is approximated: the controller re-sends this every 150 ms while held
   if(netInput[slot]){
     netInput[slot].gunHeld=true;
@@ -821,7 +1002,8 @@ socket.on('ctrl_gun',({slot})=>{
   }
 });
 socket.on('ctrl_torpedo',({slot})=>{
-  if(!gameActive||countdownT>0) return;
+  if(!gameActive||countdownT>0||paused) return;
+  if(mode==='solo'&&slot!=='A') return;
   const ship=slot==='A'?shipA:shipB;
   if(ship) fireTorpedoes(ship);
 });
