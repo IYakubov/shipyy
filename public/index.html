@@ -194,6 +194,28 @@ function sfxClick(){playSample(SND_RICOCHET_SRC,.45);}
 function sfxReady(){playSample(SND_ENERGY_SRC,.55);}
 function sfxWin(){playSample(SND_VICTORY_SRC,.85);}
 
+// ── background music: loops through the battle, fades out when a ship sinks ──
+const MUSIC_VOL=0.35;
+const music=new Audio('assets/ship-music.mp3');
+music.loop=true; music.preload='auto'; music.volume=0;
+let musicFade=null;
+function fadeMusic(to,ms,done){
+  clearInterval(musicFade);
+  const from=music.volume, t0=performance.now();
+  musicFade=setInterval(()=>{
+    const k=Math.min(1,(performance.now()-t0)/ms);
+    music.volume=Math.max(0,Math.min(1,from+(to-from)*k));
+    if(k>=1){ clearInterval(musicFade); musicFade=null; if(done) done(); }
+  },40);
+}
+function startMusic(){
+  try{ music.currentTime=0; }catch(e){}
+  music.volume=0;
+  const p=music.play(); if(p&&p.catch) p.catch(()=>{});
+  fadeMusic(MUSIC_VOL,800);
+}
+function stopMusic(ms){ fadeMusic(0,ms||1200,()=>music.pause()); }
+
 // ═══════════════════════════════════════════════════════
 //  CANVAS / ARENA
 // ═══════════════════════════════════════════════════════
@@ -749,6 +771,7 @@ function chooseMenu(i){
 
 function endMatch(winnerSide){
   if(!gameActive) return;
+  stopMusic(900);
   gameActive=false;
   setStatus('Player '+winnerSide+' wins');
   sfxWin();
@@ -802,6 +825,7 @@ socket.on('player_left',({slot})=>{
 socket.on('player_joined',({slot})=>{ if(gameActive) toast('Player '+slot+' is back'); });
 
 socket.on('game_start',()=>{
+  startMusic();
   menu=null;pushUi();
   hideScreens();
   resize();initSea();resetShips();buildHP();

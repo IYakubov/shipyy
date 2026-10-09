@@ -85,5 +85,8 @@ PROJECT STRUCTURE
 server.js               Express + Socket.io (rooms, QR, slots, relay)
 public/index.html       Host display (sounds embedded as base64)
 public/controller.html  Phone controller
-public/assets/          Wheel dial + wheel (recoloured via currentColor)
+public/assets/          Wheel dial + wheel (recoloured via currentColor),
+                        ship-music.mp3 (battle background music, loops at
+                        35% volume, fades in on start / out when a ship sinks;
+                        MUSIC_VOL in index.html)
 public/fonts/           Unbounded + licence
